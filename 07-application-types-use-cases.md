@@ -329,6 +329,485 @@ await auth0.loginWithRedirect({
 // Use to scope data access per tenant
 ```
 
+### Creating and Managing Organizations
+
+#### Creating an Organization
+
+**Via Dashboard**:
+1. Navigate to **Organizations** in Auth0 Dashboard
+2. Click **Create Organization**
+3. Provide:
+   - **Name**: Display name (e.g., "Acme Corporation")
+   - **Organization ID**: Unique identifier (e.g., `org_abc123`)
+   - **Display Name**: User-facing name
+   - **Logo**: Optional organization logo
+   - **Metadata**: Custom key-value pairs
+
+**Via Management API**:
+```javascript
+POST /api/v2/organizations
+{
+  "name": "acme-corp",
+  "display_name": "Acme Corporation",
+  "branding": {
+    "logo_url": "https://acme.com/logo.png",
+    "colors": {
+      "primary": "#0066CC",
+      "page_background": "#FFFFFF"
+    }
+  },
+  "metadata": {
+    "plan": "enterprise",
+    "industry": "technology"
+  }
+}
+```
+
+#### Organization Settings
+
+**Connections**:
+- Assign specific connections to organization
+- Organization members can only use assigned connections
+- Example: Acme Corp uses their Azure AD SAML connection
+
+**Branding**:
+- Organization-specific logo
+- Custom colors
+- Branded login experience per organization
+
+**Metadata**:
+- Store organization-specific data
+- Plan type, settings, custom attributes
+- Accessible in tokens and Actions
+
+### Organization Roles
+
+#### What are Organization Roles?
+
+**Organization Roles** are distinct from regular Auth0 roles:
+- **Scoped to organization**: Role only applies within specific organization
+- **Separate from global roles**: User can have different roles in different organizations
+- **Use case**: User is Admin in Org A, but Member in Org B
+
+#### Organization Roles vs Regular Roles
+
+| Feature | Regular Roles | Organization Roles |
+|---------|--------------|-------------------|
+| **Scope** | Global (tenant-wide) | Per-organization |
+| **Use Case** | Single-tenant apps | Multi-tenant B2B apps |
+| **Assignment** | User has role globally | User has role in specific org |
+| **Permissions** | Global API permissions | Org-scoped permissions |
+| **Token Claim** | `permissions` array | `org_id` + permissions |
+
+#### Creating Organization Roles
+
+**Via Dashboard**:
+1. Navigate to **Organizations**
+2. Select an organization
+3. Go to **Roles** tab
+4. Click **Assign Roles** or **Create Role**
+5. Define role name and permissions
+
+**Via Management API**:
+```javascript
+// Create an organization role
+POST /api/v2/organizations/{org_id}/roles
+{
+  "name": "org-admin",
+  "description": "Administrator for this organization"
+}
+
+// Assign permissions to organization role
+POST /api/v2/organizations/{org_id}/roles/{role_id}/permissions
+{
+  "permissions": [
+    {
+      "permission_name": "read:organization_members",
+      "resource_server_identifier": "https://api.myapp.com"
+    },
+    {
+      "permission_name": "update:organization_settings",
+      "resource_server_identifier": "https://api.myapp.com"
+    }
+  ]
+}
+```
+
+### Assigning Roles to Organization Members
+
+#### Adding Members to Organization
+
+**Via Dashboard**:
+1. Navigate to **Organizations** → Select Organization
+2. Go to **Members** tab
+3. Click **Add Members**
+4. Search and select users
+5. Optionally assign roles during addition
+
+**Via Management API**:
+```javascript
+// Add member to organization
+POST /api/v2/organizations/{org_id}/members
+{
+  "members": [
+    "auth0|user123",
+    "auth0|user456"
+  ]
+}
+
+// Add member with specific roles
+POST /api/v2/organizations/{org_id}/members
+{
+  "members": ["auth0|user123"],
+  "roles": ["rol_orgadmin123"]
+}
+```
+
+#### Assigning Roles to Existing Members
+
+**Via Dashboard**:
+1. Navigate to **Organizations** → Select Organization
+2. Go to **Members** tab
+3. Select user
+4. Click **Assign Roles**
+5. Choose one or more roles
+6. Click **Assign**
+
+**Via Management API**:
+```javascript
+// Assign roles to organization member
+POST /api/v2/organizations/{org_id}/members/{user_id}/roles
+{
+  "roles": [
+    "rol_orgadmin123",
+    "rol_orgmanager456"
+  ]
+}
+
+// Remove roles from organization member
+DELETE /api/v2/organizations/{org_id}/members/{user_id}/roles
+{
+  "roles": ["rol_orgadmin123"]
+}
+```
+
+#### Listing Member Roles
+
+**Via Management API**:
+```javascript
+// Get roles for a specific member in organization
+GET /api/v2/organizations/{org_id}/members/{user_id}/roles
+
+// Response
+{
+  "roles": [
+    {
+      "id": "rol_abc123",
+      "name": "org-admin",
+      "description": "Organization Administrator"
+    }
+  ]
+}
+
+// Get all members with a specific role
+GET /api/v2/organizations/{org_id}/roles/{role_id}/users
+```
+
+### Organization Invitations
+
+#### What are Organization Invitations?
+
+Invite users to join an organization:
+- Send invitation to email address
+- User doesn't need to exist in Auth0 yet
+- Can assign roles during invitation
+- Invitation expires after set period
+
+#### Creating Invitations
+
+**Via Dashboard**:
+1. Navigate to **Organizations** → Select Organization
+2. Go to **Invitations** tab
+3. Click **Invite Members**
+4. Enter email address(es)
+5. Optionally assign roles
+6. Send invitation
+
+**Via Management API**:
+```javascript
+// Create organization invitation
+POST /api/v2/organizations/{org_id}/invitations
+{
+  "inviter": {
+    "name": "Admin User"
+  },
+  "invitee": {
+    "email": "newuser@example.com"
+  },
+  "client_id": "your_app_client_id",
+  "roles": ["rol_orgmember123"],
+  "ttl_sec": 604800  // 7 days
+}
+
+// Response includes invitation URL
+{
+  "id": "inv_abc123",
+  "ticket_id": "ticket_xyz789",
+  "invitation_url": "https://your-tenant.auth0.com/...",
+  "expires_at": "2026-02-01T12:00:00.000Z"
+}
+```
+
+#### Invitation Flow
+
+1. **Admin sends invitation**
+   - Creates invitation with email + roles
+   - Invitation URL generated
+
+2. **User receives email**
+   - Email contains invitation link
+   - Link includes organization context
+
+3. **User clicks link**
+   - Redirected to Auth0 login/signup
+   - Organization context maintained
+
+4. **User authenticates**
+   - New user: Creates account
+   - Existing user: Signs in
+
+5. **User added to organization**
+   - Automatically becomes member
+   - Assigned roles applied
+   - Can access organization resources
+
+### Organization Permissions in Tokens
+
+#### Organization ID in Tokens
+
+When user logs in with organization:
+```javascript
+// ID Token
+{
+  "sub": "auth0|123456",
+  "email": "user@example.com",
+  "org_id": "org_abc123",
+  "org_name": "Acme Corporation"
+}
+
+// Access Token
+{
+  "sub": "auth0|123456",
+  "org_id": "org_abc123",
+  "permissions": [
+    "read:organization_members",
+    "update:organization_settings"
+  ]
+}
+```
+
+#### Enforcing Organization Context
+
+**In Actions**:
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  // Ensure user is member of requested organization
+  const requestedOrg = event.organization?.id;
+  const userOrgs = event.user.org_member || [];
+  
+  if (requestedOrg && !userOrgs.includes(requestedOrg)) {
+    api.access.deny('You are not a member of this organization');
+  }
+  
+  // Add organization-specific claims
+  if (event.organization) {
+    api.idToken.setCustomClaim('https://myapp.com/org_role', 
+      event.authorization?.roles || []
+    );
+  }
+};
+```
+
+**In Your Application**:
+```javascript
+// Validate organization from token
+function validateOrganization(token, expectedOrgId) {
+  const decoded = jwt.verify(token, publicKey);
+  
+  if (decoded.org_id !== expectedOrgId) {
+    throw new Error('Invalid organization');
+  }
+  
+  return decoded;
+}
+
+// Filter data by organization
+app.get('/api/data', (req, res) => {
+  const token = validateToken(req);
+  const orgId = token.org_id;
+  
+  // Only return data for user's organization
+  const data = db.query(
+    'SELECT * FROM data WHERE org_id = ?',
+    [orgId]
+  );
+  
+  res.json(data);
+});
+```
+
+### Organization Member Management Best Practices
+
+#### Role Assignment
+
+✅ **Use meaningful role names**
+- "Organization Admin", "Organization Member"
+- Not "Role1", "Role2"
+
+✅ **Assign minimum necessary permissions**
+- Principle of least privilege
+- Grant only what's needed for job function
+
+✅ **Use roles, not individual permissions**
+- Easier to manage
+- Consistent across organization
+
+✅ **Document role purposes**
+- Clear description of what each role does
+- Who should have which role
+
+#### Member Lifecycle
+
+✅ **Onboarding**
+- Use invitations for new members
+- Assign default role during invitation
+- Automated welcome workflow
+
+✅ **Role Changes**
+- Log all role assignments/removals
+- Require approval for privileged roles
+- Audit trail for compliance
+
+✅ **Offboarding**
+- Remove from organization (not delete user)
+- User can still exist in other organizations
+- Revoke all organization-specific access
+
+#### Security
+
+✅ **Validate organization membership**
+- Always check `org_id` in tokens
+- Verify user belongs to organization
+- Don't trust client-provided org ID
+
+✅ **Organization isolation**
+- Data segregation per organization
+- No cross-organization data leakage
+- Test isolation thoroughly
+
+✅ **Admin delegation**
+- Allow organization admins to manage their members
+- Limit to organization scope (not tenant-wide)
+- Audit admin actions
+
+### Use Case Examples
+
+#### Example 1: B2B SaaS with Multiple Customers
+
+**Scenario**: Project management tool with multiple company customers
+
+**Setup**:
+```javascript
+// Organizations
+- org_acme: Acme Corporation
+- org_globex: Globex Corporation
+- org_initech: Initech
+
+// Roles per organization
+- org-owner: Full control
+- org-admin: Manage members, settings
+- org-member: Access projects, create tasks
+- org-guest: View-only access
+
+// Member assignments
+Acme Corporation:
+  - alice@acme.com: org-owner
+  - bob@acme.com: org-admin
+  - charlie@acme.com: org-member
+
+Globex Corporation:
+  - dave@globex.com: org-owner
+  - eve@globex.com: org-member
+```
+
+**Implementation**:
+- Each company is an organization
+- Company admin manages their members
+- Users can only see their organization's data
+- Organization ID used to scope all queries
+
+#### Example 2: User in Multiple Organizations
+
+**Scenario**: Consultant works with multiple clients
+
+**Setup**:
+```javascript
+User: consultant@example.com
+
+Organization Memberships:
+- Acme Corp (org_acme): org-admin
+- Globex Corp (org_globex): org-member
+- Initech (org_initech): org-guest
+
+// User has different roles in each organization
+```
+
+**Login Flow**:
+```javascript
+// User selects organization at login
+await auth0.loginWithRedirect({
+  organization: 'org_acme'  // Logging into Acme
+});
+
+// Token includes selected organization
+{
+  "org_id": "org_acme",
+  "permissions": ["manage:members", "update:settings"]  // Admin permissions
+}
+
+// If logs into Globex instead
+{
+  "org_id": "org_globex",
+  "permissions": ["read:projects", "create:tasks"]  // Member permissions
+}
+```
+
+#### Example 3: Organization-Specific SSO
+
+**Scenario**: Each customer uses their own identity provider
+
+**Setup**:
+```javascript
+// Acme uses Azure AD SAML
+Organization: org_acme
+Connection: acme-azure-ad-saml
+Domain: @acme.com
+
+// Globex uses Okta OIDC
+Organization: org_globex
+Connection: globex-okta-oidc
+Domain: @globex.com
+
+// Home Realm Discovery
+if (email.endsWith('@acme.com')) {
+  // Route to Acme's Azure AD
+  organization = 'org_acme'
+} else if (email.endsWith('@globex.com')) {
+  // Route to Globex's Okta
+  organization = 'org_globex'
+}
+```
+
 ### Multi-Tenant Strategies
 
 #### 1. Separate Connections per Tenant
@@ -392,3 +871,14 @@ await auth0.loginWithRedirect({
 ✅ **Client Credentials Flow**: M2M only, no user context  
 ✅ **Auth0 Organizations**: Multi-tenancy feature for B2B SaaS  
 ✅ **Home Realm Discovery**: Route users to correct IdP by email domain  
+✅ **Organization Roles**: Scoped to specific organization, different from global roles  
+✅ **Create Organizations**: Via Dashboard or Management API with name, branding, metadata  
+✅ **Assign Roles to Members**: Add members first, then assign organization-specific roles  
+✅ **Organization Invitations**: Invite users by email, can assign roles during invitation  
+✅ **org_id in tokens**: Always present when user logs in with organization context  
+✅ **Organization vs Regular Roles**: Organization roles are per-org, regular roles are global  
+✅ **Member management**: Add via Dashboard or POST /api/v2/organizations/{org_id}/members  
+✅ **Role assignment**: POST /api/v2/organizations/{org_id}/members/{user_id}/roles  
+✅ **User in multiple orgs**: Can have different roles in different organizations  
+✅ **Organization-specific connections**: Each org can have its own SSO provider  
+✅ **Validate org membership**: Always check org_id in token matches expected organization  

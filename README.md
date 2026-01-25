@@ -53,7 +53,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Error Pages (when displayed, how to customize)
 - Customizing Error Pages (CEP)
 
-### [06 - Multi-Factor Authentication](./06-mfa-and-security.md)
+### [06 - Multi-Factor Authentication and Security](./06-mfa-and-security.md)
 - MFA Fundamentals
 - MFA Factors in Auth0 (TOTP, SMS, Email, Push, WebAuthn, etc.)
 - Auth0 Guardian (detailed features and configuration)
@@ -61,7 +61,10 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Conditional MFA via Actions
 - Remember Browser Feature
 - MFA Reset and Recovery Codes
-- MFA Best Practices
+- Attack Protection (Bot Detection, Brute Force, Throttling)
+- Brute Force Protection and IP Blocking
+- Suspicious IP Throttling Rates
+- Breached Password Detection
 
 ### [07 - Application Types and Use Cases](./07-application-types-use-cases.md)
 - Application Types (Regular Web, SPA, Native, M2M)
@@ -78,6 +81,22 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - RBAC Components (Users, Roles, Permissions, Resources)
 - Setting up RBAC in Auth0
 - Permissions in Access Tokens
+- Scopes vs Permissions
+- Authorization Strategies (RBAC, ABAC, ACL, ReBAC)
+- API Authorization Implementation
+- Authorization Best Practices
+
+### [09 - Session Management and Logout](./09-session-management-logout.md)
+- Session Management Fundamentals
+- Three Session Layers (Application, Auth0 SSO, IdP)
+- Single Sign-On (SSO) Sessions
+- Logout Options (Application, Auth0, Federated, Back-Channel, Global)
+- Federated Logout (when and why to use)
+- Back-Channel Logout
+- Session Timeout Scenarios
+- Multi-Tenancy vs Single Tenancy
+- Auth0 Organizations for Multi-Tenancy
+- Session Management Best Practices
 - Scopes vs Permissions
 - Authorization Strategies (RBAC, ABAC, ACL, ReBAC)
 - API Authorization Implementation
@@ -116,6 +135,11 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 | Access Token Default Lifetime | 24 hours | Configurable per API |
 | ID Token Default Lifetime | 10 hours | Configurable |
 | Remember Browser (MFA) | 30 days | Default, configurable |
+| SSO Session Inactivity | 3 days | Default, configurable |
+| SSO Session Absolute | 7 days | Default, configurable |
+| Brute Force Threshold | 10 attempts | Per user from same IP |
+| Brute Force Threshold (Global) | 100 attempts | From same IP, any users |
+| Suspicious IP Throttling | 10 req/sec | Per IP per endpoint |
 
 ### Connection Types Quick Reference
 
@@ -188,6 +212,9 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 9. **AAL Levels**: AAL1, AAL2, AAL3 requirements and use cases
 10. **Step-Up Authentication**: When and how to implement
 11. **Adaptive MFA**: Risk factors and implementation
+12. **Logout Types**: Application, Auth0, Federated, Back-Channel, Global
+13. **Brute Force Protection**: IP blocking conditions and thresholds
+14. **Multi-Tenancy**: Organizations vs separate tenants
 
 ### Frequently Tested
 - Custom domain setup steps
@@ -201,6 +228,10 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - AAL levels and when to require each
 - Step-up authentication implementation
 - Adaptive MFA risk factors
+- Logout options and when to use federated logout
+- Brute force protection IP unblock conditions
+- Throttling rates and limits
+- Multi-tenancy implementation approaches
 
 ### Tricky Areas
 - **Scopes vs Permissions**: Scopes = app capability, Permissions = user capability
@@ -212,6 +243,11 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - **Step-Up vs Adaptive MFA**: Step-up = action-based, Adaptive = login-time risk assessment
 - **AAL2 vs AAL3**: AAL2 = any MFA, AAL3 = hardware-based MFA required
 - **Authenticator factors**: Biometrics = inherence + possession (device required)
+- **Federated logout**: Terminates IdP session too, warn users, used with enterprise
+- **IP unblock conditions**: Admin removes, threshold raised, OR user changes password on ALL linked accounts
+- **Throttling vs Brute Force**: Throttling = rate limit (429), Brute Force = block (until unblocked)
+- **Auth0 logout vs Federated**: Auth0 = SSO only, Federated = SSO + IdP
+- **Multi-tenancy**: Organizations (recommended) vs metadata vs separate connections
 
 ## 🎓 Study Tips
 
@@ -275,6 +311,22 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - [ ] Understand risk factors for adaptive authentication
 - [ ] Know authenticator types by factor (knowledge, possession, inherence)
 - [ ] Understand application types and client types
+- [ ] Know custom domain setup process
+- [ ] Understand error page customization
+- [ ] Know account linking methods
+- [ ] Understand B2B vs B2C vs B2E differences
+- [ ] Know all logout types (Application, Auth0, Federated, Back-Channel, Global)
+- [ ] Understand when to use federated logout
+- [ ] Know three session layers (App, Auth0 SSO, IdP)
+- [ ] Understand brute force protection and IP blocking conditions
+- [ ] Know throttling rates (10 req/sec per IP)
+- [ ] Understand bot detection with CAPTCHA
+- [ ] Know multi-tenancy vs single tenancy
+- [ ] Understand Auth0 Organizations for multi-tenancy
+- [ ] Complete hands-on lab: Secure Auth0 Applications with MFA
+- [ ] Test all MFA factors in practice
+- [ ] Practice implementing attack protection features
+- [ ] Test different logout scenarios
 - [ ] Know custom domain setup process
 - [ ] Understand error page customization
 - [ ] Know account linking methods
