@@ -407,6 +407,206 @@ Available in error page template:
 - Use your own domain (covered above)
 - Fully branded URL
 
+## Email Templates
+
+### Overview
+
+Auth0 sends various transactional emails that can be customized:
+
+| Template | When Sent | Purpose |
+|----------|-----------|---------|
+| **Verification Email** | After signup | Verify email address |
+| **Welcome Email** | After signup | Welcome new user |
+| **Change Password** | Password reset request | Reset password link |
+| **Blocked Account** | Account locked | Notify user of block |
+| **Password Breach Alert** | Breached password detected | Prompt password change |
+| **MFA Enrollment** | MFA setup | Send enrollment instructions |
+| **Passwordless Email** | Passwordless login | Send magic link or code |
+
+### Configuring Email Templates
+
+**Dashboard → Branding → Email Templates**
+
+#### Template Variables
+
+Common variables available in all templates:
+
+| Variable | Description |
+|----------|-------------|
+| `{{ application.name }}` | Application name |
+| `{{ user.email }}` | User's email address |
+| `{{ user.name }}` | User's full name |
+| `{{ url }}` | Action URL (verify, reset, etc.) |
+| `{{ tenant.friendly_name }}` | Tenant name |
+| `{{ sender.name }}` | Sender name |
+| `{{ date }}` | Current date |
+
+### Verification Email
+
+**When Sent**: After user signs up with email/password
+
+**Key Variables**:
+- `{{ url }}` - Verification link
+- `{{ user.email }}` - User's email
+
+**Example Template**:
+```html
+<!DOCTYPE html>
+<html>
+<head>
+  <style>
+    .button { 
+      background-color: #0066CC; 
+      color: white; 
+      padding: 12px 24px;
+      text-decoration: none;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+<body>
+  <h1>Welcome to {{ application.name }}!</h1>
+  <p>Hi {{ user.name }},</p>
+  <p>Thanks for signing up. Please verify your email address.</p>
+  <p>
+    <a href="{{ url }}" class="button">Verify Email</a>
+  </p>
+  <p>If you didn't sign up, you can ignore this email.</p>
+  <p>This link expires in {{ verification_timeout }} hours.</p>
+</body>
+</html>
+```
+
+### Change Password Email
+
+**When Sent**: When user requests password reset
+
+**Key Variables**:
+- `{{ url }}` - Password reset link
+- `{{ user.email }}` - User's email
+
+**Example Template**:
+```html
+<h1>Reset Your Password</h1>
+<p>Hi {{ user.name }},</p>
+<p>We received a request to reset your password for {{ application.name }}.</p>
+<p>
+  <a href="{{ url }}">Reset Password</a>
+</p>
+<p>If you didn't request this, please ignore this email or contact support.</p>
+<p>This link expires in {{ change_password_timeout }} hours.</p>
+```
+
+### Welcome Email
+
+**When Sent**: After successful signup (optional - must enable)
+
+**Purpose**: Welcome user, provide getting started info
+
+**Example Template**:
+```html
+<h1>Welcome to {{ application.name }}!</h1>
+<p>Hi {{ user.name }},</p>
+<p>Your account has been created successfully.</p>
+<p>Here's how to get started:</p>
+<ul>
+  <li>Complete your profile</li>
+  <li>Explore features</li>
+  <li>Check our documentation</li>
+</ul>
+<p>Need help? Contact us at support@example.com</p>
+```
+
+### Passwordless Email Templates
+
+#### Magic Link
+```html
+<h1>Login to {{ application.name }}</h1>
+<p>Click the link below to log in:</p>
+<p><a href="{{ url }}">Login</a></p>
+<p>This link expires in {{ code_timeout }} minutes.</p>
+<p>If you didn't request this, ignore this email.</p>
+```
+
+#### One-Time Code
+```html
+<h1>Your Login Code</h1>
+<p>Use this code to log in to {{ application.name }}:</p>
+<h2 style="font-size: 32px; letter-spacing: 5px;">{{ code }}</h2>
+<p>This code expires in {{ code_timeout }} minutes.</p>
+```
+
+### Email Provider Configuration
+
+#### Default (Auth0)
+- Limited sending (development only)
+- No customization of FROM address
+- Rate limited
+
+#### Custom Email Provider (Production)
+Supported providers:
+- **SendGrid**
+- **Amazon SES**
+- **Mailgun**
+- **Mandrill**
+- **SparkPost**
+- **Custom SMTP**
+
+**Configuration**:
+**Dashboard → Branding → Email Provider**
+
+1. Select provider
+2. Enter API credentials
+3. Configure FROM address
+4. Test email delivery
+
+### Email Customization Best Practices
+
+✅ **Brand consistently**
+- Use company colors and logo
+- Match website/app design
+
+✅ **Keep it simple**
+- Clear call-to-action
+- Mobile-responsive design
+- Minimal text
+
+✅ **Security**
+- Don't include sensitive info
+- Clear expiration time
+- Instructions if not requested
+
+✅ **Testing**
+- Test in multiple email clients
+- Check spam filters
+- Verify links work
+
+✅ **Localization**
+- Support multiple languages
+- Use Liquid templates for i18n
+
+### Email Template Syntax (Liquid)
+
+Auth0 uses Liquid templating for emails:
+
+```html
+<!-- Conditional -->
+{% if user.name %}
+  <p>Hello, {{ user.name }}!</p>
+{% else %}
+  <p>Hello!</p>
+{% endif %}
+
+<!-- Loops -->
+{% for item in items %}
+  <li>{{ item }}</li>
+{% endfor %}
+
+<!-- Filters -->
+<p>{{ user.name | capitalize }}</p>
+<p>{{ date | date: "%B %d, %Y" }}</p>
+```
+
 ## Key Exam Takeaways
 
 ✅ **Actions**: Node.js 18, max 20 sec timeout, max 5 MB total size  
@@ -422,3 +622,8 @@ Available in error page template:
 ✅ **Action timeout**: 20 seconds, then fails  
 ✅ **Custom domain benefits**: Branding, trust, avoid cookie issues  
 ✅ **Custom domain setup**: Domain verification → SSL cert → DNS CNAME → Update callbacks  
+✅ **Email templates**: Verification, Welcome, Change Password, Passwordless  
+✅ **Email variables**: {{ user.email }}, {{ url }}, {{ application.name }}  
+✅ **Custom email provider**: Required for production (SendGrid, SES, Mailgun)  
+✅ **Default email provider**: Development only, limited sending  
+✅ **Liquid templating**: Used for email templates (conditionals, loops)  

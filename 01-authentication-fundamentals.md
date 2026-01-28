@@ -210,6 +210,367 @@ Auth0's native MFA solution:
 - Fallback methods for unsupported devices
 - User education and onboarding
 
+## Cross-Origin Authentication
+
+### What is Cross-Origin Authentication?
+
+Cross-origin authentication occurs when your application makes authentication requests to Auth0 from a different domain/origin than Auth0's hosted login page.
+
+### Understanding the Problem
+
+**Same-Origin Policy**:
+- Browsers restrict cross-origin requests for security
+- Auth0 tenant: `https://your-tenant.auth0.com`
+- Your app: `https://yourapp.com`
+- These are different origins → cross-origin
+
+**Why It Matters**:
+- Authentication requires cookies and sessions
+- Third-party cookie restrictions (Safari ITP, Chrome phasing out)
+- Silent authentication relies on cookies
+- Embedded login forms face cross-origin challenges
+
+### Universal Login vs Embedded Login
+
+#### Universal Login (Recommended)
+
+**How it works**:
+- User redirects to Auth0 hosted login page
+- Authentication happens on Auth0 domain
+- User redirects back to your app with code/tokens
+- **First-party cookies** used (no cross-origin issues)
+
+**Benefits**:
+- ✅ No cross-origin complications
+- ✅ Best browser compatibility
+- ✅ Automatic security updates from Auth0
+- ✅ Works with all connection types
+- ✅ Supports social and enterprise connections
+- ✅ Custom Universal Login via Lock or SDK
+
+#### Embedded Login (Cross-Origin)
+
+**How it works**:
+- Login form embedded in your application
+- Authentication request made from your domain to Auth0
+- **Third-party cookies** required (cross-origin)
+
+**Challenges**:
+- ⚠️ Third-party cookies blocked by browsers
+- ⚠️ Safari ITP blocks cross-origin cookies
+- ⚠️ Chrome phasing out third-party cookies
+- ⚠️ Requires custom domains to work reliably
+- ⚠️ Limited social/enterprise connection support
+
+### Custom Domains for Cross-Origin
+
+**Solution**: Use Auth0 Custom Domains
+
+**How it helps**:
+- Your app: `https://app.example.com`
+- Auth0 custom domain: `https://auth.example.com`
+- Same parent domain (example.com)
+- Cookies treated as first-party
+
+**Configuration**:
+1. Configure custom domain in Auth0
+2. Add DNS records (CNAME)
+3. Verify domain ownership
+4. Use custom domain in SDK configuration
+
+### Cross-Origin Authentication Methods
+
+#### 1. Authorization Code Flow with PKCE
+```javascript
+// Redirect to Auth0 for authentication
+// Works without cross-origin cookie issues
+await auth0.loginWithRedirect({
+  redirect_uri: 'https://yourapp.com/callback'
+});
+```
+
+#### 2. Silent Authentication
+```javascript
+// Uses hidden iframe to check session
+// Requires third-party cookies OR custom domain
+try {
+  const result = await auth0.getTokenSilently();
+} catch (error) {
+  if (error.error === 'login_required') {
+    // Session expired, redirect to login
+  }
+}
+```
+
+**Note**: Silent authentication may fail in browsers blocking third-party cookies without custom domain.
+
+#### 3. Refresh Token Rotation (Alternative)
+```javascript
+// Instead of silent auth with iframes
+// Use refresh tokens for SPAs
+// Requires offline_access scope
+await auth0.createAuth0Client({
+  domain: 'your-tenant.auth0.com',
+  clientId: 'your-client-id',
+  useRefreshTokens: true, // Enable refresh tokens
+  cacheLocation: 'localstorage'
+});
+```
+
+### Browser Third-Party Cookie Restrictions
+
+| Browser | Status | Impact |
+|---------|--------|--------|
+| **Safari** | Blocks by default (ITP) | Silent auth fails without custom domain |
+| **Firefox** | Enhanced Tracking Protection | May block in strict mode |
+| **Chrome** | Phasing out 3rd party cookies | Future impact on embedded login |
+| **Edge** | Similar to Chrome | Follows Chromium timeline |
+
+### Best Practices
+
+✅ **Use Universal Login** (recommended approach)
+- Avoids cross-origin issues entirely
+- Best browser compatibility
+- Security updates automatic
+
+✅ **Implement Custom Domains** for:
+- Better branding
+- Cross-origin authentication support
+- Silent authentication reliability
+
+✅ **Use Refresh Tokens** as fallback:
+- Enable `useRefreshTokens: true` in SDK
+- Works when silent auth fails
+- Implement refresh token rotation
+
+✅ **Handle Silent Auth Failures**:
+```javascript
+try {
+  await auth0.getTokenSilently();
+} catch (error) {
+  if (error.error === 'login_required' || 
+      error.error === 'consent_required') {
+    // Fallback: redirect to login
+    await auth0.loginWithRedirect();
+  }
+}
+```
+
+✅ **Test Across Browsers**:
+- Safari (most restrictive)
+- Private/incognito modes
+- With various privacy settings
+
+### Cross-Origin and SSO
+
+**Single Sign-On challenges**:
+- SSO relies on session cookies on Auth0 domain
+- Cross-origin restrictions affect SSO detection
+- Custom domains enable reliable SSO
+
+**SSO with Custom Domain**:
+```javascript
+// Using custom domain for reliable SSO
+await auth0.createAuth0Client({
+  domain: 'auth.example.com', // Custom domain
+  clientId: 'your-client-id'
+});
+
+// Check if user is already authenticated
+const isAuthenticated = await auth0.isAuthenticated();
+```
+
+### When to Use Each Approach
+
+| Scenario | Recommendation |
+|----------|---------------|
+| New application | Universal Login |
+| Custom login UI needed | Universal Login + Custom Template |
+| Must embed login form | Custom Domain + Handle cookie issues |
+| SPA with silent auth | Custom Domain OR Refresh Token Rotation |
+| Mobile app | Native SDKs (no cross-origin issues) |
+| Server-side app | Authorization Code Flow (no cross-origin) |
+
+## Silent Authentication
+
+### What is Silent Authentication?
+
+Silent authentication allows an application to check if a user has an active Auth0 session **without user interaction**. It's commonly used in Single Page Applications (SPAs) to:
+- Check session on app startup
+- Renew tokens before expiration
+- Maintain seamless user experience
+
+### How Silent Authentication Works
+
+1. **SDK creates hidden iframe** pointing to Auth0
+2. **Auth0 checks for session cookie** on its domain
+3. **If session exists**: Returns new tokens via iframe
+4. **If no session**: Returns `login_required` error
+
+```javascript
+// Using auth0-spa-js
+try {
+  const token = await auth0.getTokenSilently();
+  // Session active, got new token
+} catch (error) {
+  if (error.error === 'login_required') {
+    // No active session, redirect to login
+    await auth0.loginWithRedirect();
+  }
+}
+```
+
+### Technical Implementation
+
+**Authorize Request with prompt=none**:
+```
+GET /authorize?
+  response_type=code
+  &client_id={CLIENT_ID}
+  &redirect_uri={CALLBACK_URL}
+  &scope=openid profile
+  &prompt=none          // Key parameter: no UI shown
+  &state={STATE}
+  &code_challenge={PKCE_CHALLENGE}
+  &code_challenge_method=S256
+```
+
+**Possible Responses**:
+| Response | Meaning | Action |
+|----------|---------|--------|
+| `code` in callback | Session valid | Exchange for tokens |
+| `login_required` | No session | Redirect to login |
+| `consent_required` | Consent needed | Redirect with consent |
+| `interaction_required` | User action needed | Redirect to login |
+
+### When Silent Auth Fails
+
+**Common Failure Scenarios**:
+
+1. **No Active Session**: User logged out or session expired
+2. **Third-Party Cookies Blocked**: Safari ITP, privacy browsers
+3. **Consent Required**: New scopes requested
+4. **MFA Required**: Step-up authentication needed
+5. **Timeout**: Network issues or Auth0 unreachable
+
+**Error Handling Pattern**:
+```javascript
+try {
+  await auth0.getTokenSilently();
+} catch (error) {
+  switch (error.error) {
+    case 'login_required':
+    case 'consent_required':
+    case 'interaction_required':
+      // User interaction needed
+      await auth0.loginWithRedirect();
+      break;
+    case 'timeout':
+      // Retry or show error
+      console.error('Silent auth timed out');
+      break;
+    default:
+      console.error('Unexpected error:', error);
+  }
+}
+```
+
+### Silent Auth vs Refresh Tokens
+
+| Feature | Silent Authentication | Refresh Tokens |
+|---------|----------------------|----------------|
+| **Mechanism** | Hidden iframe + cookies | Token exchange |
+| **Browser Dependency** | Requires third-party cookies | No cookies needed |
+| **Safari/ITP** | ❌ Fails without custom domain | ✅ Works |
+| **Privacy Mode** | ❌ Often fails | ✅ Works |
+| **Session Detection** | ✅ Checks SSO session | ❌ App-specific only |
+| **Storage** | Session cookie (Auth0 domain) | localStorage/memory |
+| **Recommended For** | SSO across apps | Single app persistence |
+
+### Configuring Silent Auth
+
+**SDK Configuration**:
+```javascript
+const auth0 = await createAuth0Client({
+  domain: 'your-tenant.auth0.com',
+  clientId: 'your-client-id',
+  
+  // For silent auth (traditional)
+  cacheLocation: 'memory', // More secure
+  
+  // OR for refresh token approach (recommended)
+  useRefreshTokens: true,
+  cacheLocation: 'localstorage'
+});
+```
+
+**With Refresh Token Fallback**:
+```javascript
+const auth0 = await createAuth0Client({
+  domain: 'your-tenant.auth0.com',
+  clientId: 'your-client-id',
+  useRefreshTokens: true, // Use refresh tokens
+  useRefreshTokensFallback: true // Fallback to iframe if needed
+});
+```
+
+### checkSession Method
+
+The Auth0 SPA SDK provides `checkSession()` for explicit session checking:
+
+```javascript
+// On app initialization
+async function initApp() {
+  const auth0 = await createAuth0Client(config);
+  
+  // Check if user has active session
+  try {
+    await auth0.checkSession();
+    const isAuthenticated = await auth0.isAuthenticated();
+    
+    if (isAuthenticated) {
+      const user = await auth0.getUser();
+      console.log('User already logged in:', user);
+    }
+  } catch (error) {
+    console.log('No active session');
+  }
+}
+```
+
+**When to Use checkSession**:
+- App initialization (check for existing session)
+- After returning from another tab/window
+- Periodic session validation
+
+### Best Practices for Silent Authentication
+
+✅ **Use Custom Domains** for reliable cross-origin silent auth  
+✅ **Enable Refresh Token Rotation** as primary method for SPAs  
+✅ **Implement Fallback Logic** for when silent auth fails  
+✅ **Handle All Error Cases** gracefully with user-friendly messages  
+✅ **Set Appropriate Timeouts** to avoid hanging requests  
+✅ **Test in Private/Incognito** mode to verify fallback works  
+✅ **Consider SSO Requirements** - refresh tokens don't detect SSO logout  
+
+### Silent Auth and SSO Considerations
+
+**Important**: Refresh tokens don't detect SSO session changes!
+
+```javascript
+// User logged out from another app
+// Silent auth would detect this:
+await auth0.getTokenSilently(); // Fails with 'login_required'
+
+// But refresh tokens would still work:
+// User stays logged in to this app even if SSO session ended
+```
+
+**If SSO is Critical**:
+- Use silent auth with custom domains
+- Periodically call `checkSession()` to verify SSO state
+- Implement session polling for critical apps
+
 ## Authentication Assurance Levels (AAL)
 
 ### What is AAL?
@@ -607,3 +968,14 @@ Email change allowed
 ✅ **Biometric authenticators**: Often inherence + possession (device required)  
 ✅ **Risk factors for adaptive MFA**: Location, device, time, velocity, network, threat intelligence  
 ✅ **Step-up vs Adaptive**: Step-up = action-triggered, Adaptive = login-time risk assessment  
+✅ **Cross-Origin Authentication**: Auth requests from different domain than Auth0  
+✅ **Universal Login**: Recommended - avoids cross-origin issues, uses first-party cookies  
+✅ **Embedded Login**: Faces third-party cookie restrictions, needs custom domain  
+✅ **Third-party cookie blocking**: Safari ITP, Chrome phasing out - affects silent auth  
+✅ **Custom Domains**: Enable reliable cross-origin auth and silent authentication  
+✅ **Silent Authentication**: Uses iframe to check session, requires cookies or refresh tokens  
+✅ **Refresh Token Rotation**: Alternative to silent auth for SPAs when cookies blocked  
+✅ **Silent auth uses prompt=none**: No UI shown, fails if user interaction needed  
+✅ **Silent auth errors**: login_required, consent_required, interaction_required  
+✅ **checkSession()**: Explicitly check for existing session on app startup  
+✅ **Refresh tokens don't detect SSO logout**: Only silent auth checks SSO session state  

@@ -564,6 +564,252 @@ exports.onExecutePostLogin = async (event, api) => {
 };
 ```
 
+## Tenant Logs
+
+### What are Tenant Logs?
+
+Auth0 tenant logs capture all authentication and authorization events:
+- Security auditing and compliance
+- Debugging authentication issues
+- Monitoring user activity
+- Detecting suspicious behavior
+
+### Log Event Types
+
+#### Authentication Events
+
+| Event Code | Description |
+|------------|-------------|
+| **s** | Successful login |
+| **ss** | Successful silent authentication |
+| **f** | Failed login |
+| **fu** | Failed login (invalid email/username) |
+| **fp** | Failed login (wrong password) |
+| **fc** | Failed by connector (AD/LDAP) |
+| **fco** | Failed by CORS |
+| **ssa** | Silent authentication successful |
+| **fsa** | Silent authentication failed |
+| **pwd_leak** | Password leaked (breached password) |
+
+#### User Account Events
+
+| Event Code | Description |
+|------------|-------------|
+| **sv** | Email verification successful |
+| **fv** | Email verification failed |
+| **sv** | Email verified |
+| **scpr** | Change password request successful |
+| **scp** | Change password successful |
+| **fcp** | Change password failed |
+| **du** | User deleted |
+| **su** | User signup successful |
+| **fs** | User signup failed |
+| **pwd_reset** | Password reset requested |
+| **ublkdu** | User unblocked by admin |
+
+#### MFA Events
+
+| Event Code | Description |
+|------------|-------------|
+| **gd_send_sms** | MFA SMS sent |
+| **gd_start_enroll** | MFA enrollment started |
+| **gd_enroll_success** | MFA enrollment successful |
+| **gd_otp_rate_limit_exceed** | MFA OTP rate limit exceeded |
+| **gd_auth_failed** | MFA authentication failed |
+| **gd_auth_succeed** | MFA authentication successful |
+| **gd_recovery_succeed** | MFA recovery code used successfully |
+| **gd_unenroll** | MFA unenrollment |
+
+#### Token Events
+
+| Event Code | Description |
+|------------|-------------|
+| **sce** | Token exchange successful |
+| **fce** | Token exchange failed |
+| **seccft** | Client credentials exchange successful |
+| **feccft** | Client credentials exchange failed |
+| **seacft** | Authorization code exchange successful |
+| **feacft** | Authorization code exchange failed |
+| **sertft** | Refresh token exchange successful |
+| **fertft** | Refresh token exchange failed |
+| **slo** | Logout successful |
+
+#### API Events
+
+| Event Code | Description |
+|------------|-------------|
+| **sapi** | Management API successful |
+| **fapi** | Management API failed |
+| **scoa** | Consent accepted |
+| **fcoa** | Consent failed |
+
+### Log Data Structure
+
+Each log entry contains:
+
+```json
+{
+  "date": "2024-01-15T10:30:00.000Z",
+  "type": "s",
+  "description": "Successful login",
+  "connection": "Username-Password-Authentication",
+  "connection_id": "con_xxx",
+  "client_id": "abc123",
+  "client_name": "My App",
+  "ip": "192.168.1.1",
+  "user_agent": "Mozilla/5.0...",
+  "details": {
+    "completedAt": 1705317000000,
+    "initiatedAt": 1705316900000
+  },
+  "user_id": "auth0|12345",
+  "user_name": "user@example.com",
+  "log_id": "90020231215104556xxx"
+}
+```
+
+### Log Retention
+
+| Tenant Plan | Retention Period |
+|-------------|------------------|
+| **Free** | 2 days |
+| **Developer** | 2 days |
+| **Developer Pro** | 10 days |
+| **Enterprise** | 30 days |
+
+**Note**: Logs are stored for audit purposes; for longer retention, export to external storage.
+
+### Accessing Logs
+
+#### Dashboard
+**Monitoring → Logs**
+- Search and filter logs
+- View log details
+- Export to CSV
+
+#### Management API
+
+**Get Logs**:
+```javascript
+const ManagementClient = require('auth0').ManagementClient;
+const management = new ManagementClient({
+  domain: '{tenant}.auth0.com',
+  clientId: '{clientId}',
+  clientSecret: '{clientSecret}'
+});
+
+// Get all logs
+const logs = await management.logs.getAll({ per_page: 50 });
+
+// Get specific log by ID
+const log = await management.logs.get({ id: 'LOG_ID' });
+
+// Filter by event type
+const failedLogins = await management.logs.getAll({
+  q: 'type:f*',  // All failed events
+  per_page: 100
+});
+```
+
+#### Log Search Syntax
+
+**Query Examples**:
+```
+type:f                          # Failed events
+type:s                          # Successful logins
+user_id:"auth0|12345"           # Specific user
+client_id:"abc123"              # Specific application
+ip:"192.168.1.1"                # Specific IP
+date:[2024-01-01 TO 2024-01-31] # Date range
+type:f AND user_id:"auth0|123"  # Combined filters
+```
+
+### Log Export and Streaming
+
+#### Log Streams (Real-Time Export)
+
+Export logs in real-time to external services:
+
+| Service | Use Case |
+|---------|----------|
+| **Amazon EventBridge** | AWS integration, triggers |
+| **Azure Event Hub** | Azure integration |
+| **Datadog** | Monitoring, alerting |
+| **Splunk** | Security analytics |
+| **Sumo Logic** | Log analysis |
+| **Mixpanel** | Product analytics |
+| **Segment** | Customer data platform |
+| **Webhook** | Custom endpoints |
+
+**Configuration**:
+**Monitoring → Streams → Create Log Stream**
+
+#### Extensions for Log Export
+
+**Auth0 Log Extensions** (older method):
+- Export to Amazon S3
+- Export to Azure Blob Storage
+- Export to Loggly
+- Export to Papertrail
+
+### Using Logs for Security
+
+#### Detecting Suspicious Activity
+
+**Action Example - Log and Alert on Suspicious Login**:
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  const riskIndicators = [];
+  
+  // Check for new device
+  if (event.authentication.deviceId && 
+      !event.user.app_metadata?.known_devices?.includes(event.authentication.deviceId)) {
+    riskIndicators.push('new_device');
+  }
+  
+  // Check for unusual location
+  if (event.request.geoip?.country_code !== 
+      event.user.app_metadata?.usual_country) {
+    riskIndicators.push('unusual_location');
+  }
+  
+  // Log security event with custom data
+  if (riskIndicators.length > 0) {
+    console.log(JSON.stringify({
+      event: 'suspicious_login',
+      user_id: event.user.user_id,
+      indicators: riskIndicators,
+      ip: event.request.ip,
+      location: event.request.geoip?.country_name
+    }));
+    
+    // Could also trigger MFA or notify admin
+    api.multifactor.enable('any');
+  }
+};
+```
+
+#### Key Log Events to Monitor
+
+| Event | Indicates | Action |
+|-------|-----------|--------|
+| `f`, `fp`, `fu` | Failed logins | Watch for patterns (brute force) |
+| `pwd_leak` | Breached password | Force password reset |
+| `gd_auth_failed` | Failed MFA | Possible attack |
+| `limit_mu` | Too many users | Approaching plan limit |
+| `fsa` | Silent auth failed | Session issues |
+| `du` | User deleted | Audit if unexpected |
+
+### Best Practices
+
+✅ **Set up Log Streams** for real-time monitoring  
+✅ **Configure Alerts** for security events (failed logins, breached passwords)  
+✅ **Export to Long-Term Storage** for compliance (beyond retention period)  
+✅ **Monitor Rate Limit Events** to detect attacks  
+✅ **Track MFA Events** to ensure enrollment and usage  
+✅ **Use Search Queries** effectively for troubleshooting  
+✅ **Integrate with SIEM** (Splunk, Datadog) for enterprise security  
+
 ## Key Exam Takeaways
 
 ✅ **MFA requires 2+ factors from different categories** (knowledge, possession, inherence)  
@@ -585,3 +831,10 @@ exports.onExecutePostLogin = async (event, api) => {
 ✅ **Throttling**: 10 requests/second per IP, returns HTTP 429  
 ✅ **Throttling vs Brute Force**: Throttling = rate limit (temporary), Brute Force = IP block (until unblocked)  
 ✅ **Breached Password Detection**: Checks against known compromised password databases  
+✅ **Tenant Logs**: Capture all auth events - security, auditing, debugging  
+✅ **Log codes**: s = success, f = failed, ss = silent auth success, fsa = silent auth failed  
+✅ **Log retention**: Free/Developer = 2 days, Developer Pro = 10 days, Enterprise = 30 days  
+✅ **Log Streams**: Real-time export to Datadog, Splunk, AWS EventBridge, Azure Event Hub, webhooks  
+✅ **Management API logs**: `management.logs.getAll()` - query with Lucene syntax  
+✅ **Log search syntax**: type:f (failed), user_id:"auth0|123", date:[2024-01-01 TO 2024-01-31]  
+✅ **Key events to monitor**: f/fp/fu (failed logins), pwd_leak (breached), gd_auth_failed (MFA fail)  

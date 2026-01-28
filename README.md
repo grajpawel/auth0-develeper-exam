@@ -11,6 +11,8 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Login Credentials
 - Auth0 Guardian
 - FIDO/FIDO2/WebAuthn
+- Cross-Origin Authentication (Custom Domains, Third-Party Cookies)
+- **Silent Authentication** (prompt=none, checkSession, Refresh Token Fallback)
 - Authentication Assurance Levels (AAL1, AAL2, AAL3)
 - Step-Up Authentication
 - Adaptive MFA (Risk-Based Authentication)
@@ -21,6 +23,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - OAuth 2.0 Flows (Authorization Code, PKCE, Client Credentials, etc.)
 - Scopes and Scope Validation
 - OpenID Connect (OIDC)
+- **OIDC Request Parameters** (prompt, max_age, acr_values, login_hint, screen_hint)
 - ID Tokens vs Access Tokens
 - SAML (Security Assertion Markup Language)
 - When to use OAuth 2.0 vs OIDC vs SAML
@@ -41,6 +44,9 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Enterprise Connections (SAML, OIDC, AD/LDAP)
 - Passwordless Connections (Email, SMS)
 - Account Linking Methods
+- **Auth0 Normalized User Profile** (Standard Claims, Auth0-Specific, Metadata)
+- **SCIM (System for Cross-domain Identity Management)**
+- **Just-In-Time (JIT) Provisioning**
 - Connection Selection by Use Case
 
 ### [05 - Auth0 Actions and Customization](./05-actions-and-customization.md)
@@ -49,6 +55,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Action Triggers (post-login, pre/post-registration, etc.)
 - Action API (event and api objects)
 - Secrets and Dependencies
+- **Email Templates** (Verification, Welcome, Password Reset, MFA Enrollment, etc.)
 - Custom Domains (CCDUL - Configuring Custom Domain for Universal Login)
 - Error Pages (when displayed, how to customize)
 - Customizing Error Pages (CEP)
@@ -65,11 +72,13 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Brute Force Protection and IP Blocking
 - Suspicious IP Throttling Rates
 - Breached Password Detection
+- **Tenant Logs** (Event Types, Log Retention, Log Streams, Search Syntax)
 
 ### [07 - Application Types and Use Cases](./07-application-types-use-cases.md)
 - Application Types (Regular Web, SPA, Native, M2M)
 - When to use each application type
 - Public vs Confidential Clients
+- **Auth0 SDK Comparison** (auth0-spa-js, auth0-react, auth0.js, Lock, auth0-nextjs)
 - B2C (Business-to-Consumer)
 - B2B (Business-to-Business)
 - B2E (Business-to-Employee)
@@ -101,6 +110,26 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Authorization Strategies (RBAC, ABAC, ACL, ReBAC)
 - API Authorization Implementation
 - Authorization Best Practices
+
+### [10 - Universal Login](./10-universal-login.md)
+- Classic vs New Universal Login Experience
+- Universal Login Page Customization
+- Lock Widget vs Auth0 SDKs
+- Prompt Parameter Values (none, login, consent, select_account)
+- max_age Parameter for Re-Authentication
+- Custom Login Pages
+- Page Templates
+- Branding and Theming
+
+### [11 - Management API](./11-management-api.md)
+- Management API Overview
+- Authentication (M2M Tokens, Client Credentials)
+- Rate Limits and Throttling
+- Common Endpoints (Users, Connections, Clients, Logs)
+- CRUD Operations on Users
+- Token Management
+- Bulk Operations
+- Best Practices
 
 ## 🎯 Quick Reference Guide
 
@@ -140,6 +169,9 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 | Brute Force Threshold | 10 attempts | Per user from same IP |
 | Brute Force Threshold (Global) | 100 attempts | From same IP, any users |
 | Suspicious IP Throttling | 10 req/sec | Per IP per endpoint |
+| Log Retention (Free) | 2 days | Export for longer retention |
+| Log Retention (Enterprise) | 30 days | Developer Pro = 10 days |
+| Management API Rate Limit | Varies by endpoint | 50-100 req/sec typical |
 
 ### Connection Types Quick Reference
 
@@ -215,6 +247,10 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 12. **Logout Types**: Application, Auth0, Federated, Back-Channel, Global
 13. **Brute Force Protection**: IP blocking conditions and thresholds
 14. **Multi-Tenancy**: Organizations vs separate tenants
+15. **Silent Authentication**: prompt=none, checkSession, fallback strategies
+16. **Universal Login**: Classic vs New, Lock vs SDK
+17. **Management API**: Authentication, rate limits, common operations
+18. **Tenant Logs**: Event codes, retention, log streams
 
 ### Frequently Tested
 - Custom domain setup steps
@@ -232,6 +268,13 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Brute force protection IP unblock conditions
 - Throttling rates and limits
 - Multi-tenancy implementation approaches
+- **OIDC request parameters**: prompt, max_age, login_hint, screen_hint
+- **Silent authentication**: prompt=none behavior and failures
+- **Auth0 SDKs**: When to use each (auth0-spa-js, Lock, auth0-react, etc.)
+- **Email templates**: Types and customization
+- **SCIM vs JIT provisioning**: When to use each
+- **Log event codes**: s (success), f (failed), ss (silent auth)
+- **Management API rate limits and authentication**
 
 ### Tricky Areas
 - **Scopes vs Permissions**: Scopes = app capability, Permissions = user capability
@@ -248,6 +291,11 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - **Throttling vs Brute Force**: Throttling = rate limit (429), Brute Force = block (until unblocked)
 - **Auth0 logout vs Federated**: Auth0 = SSO only, Federated = SSO + IdP
 - **Multi-tenancy**: Organizations (recommended) vs metadata vs separate connections
+- **Silent auth vs Refresh tokens**: Silent auth checks SSO, refresh tokens don't detect SSO logout
+- **prompt=none failures**: login_required, consent_required, interaction_required
+- **SCIM vs JIT**: SCIM = pre-provisioned API-driven, JIT = on-demand at first login
+- **Classic vs New Universal Login**: New UL = recommended, customizable, better security
+- **Log retention by plan**: Free = 2 days, Developer Pro = 10 days, Enterprise = 30 days
 
 ## 🎓 Study Tips
 
@@ -323,16 +371,18 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - [ ] Understand bot detection with CAPTCHA
 - [ ] Know multi-tenancy vs single tenancy
 - [ ] Understand Auth0 Organizations for multi-tenancy
+- [ ] **Know OIDC request parameters (prompt, max_age, login_hint, screen_hint)**
+- [ ] **Understand silent authentication and prompt=none behavior**
+- [ ] **Know Auth0 SDKs and when to use each**
+- [ ] **Understand email template types and customization**
+- [ ] **Know SCIM vs JIT provisioning differences**
+- [ ] **Understand Universal Login (Classic vs New)**
+- [ ] **Know Management API authentication and rate limits**
+- [ ] **Understand tenant logs (event codes, retention, log streams)**
 - [ ] Complete hands-on lab: Secure Auth0 Applications with MFA
 - [ ] Test all MFA factors in practice
 - [ ] Practice implementing attack protection features
 - [ ] Test different logout scenarios
-- [ ] Know custom domain setup process
-- [ ] Understand error page customization
-- [ ] Know account linking methods
-- [ ] Understand B2B vs B2C vs B2E differences
-- [ ] Complete hands-on lab: Secure Auth0 Applications with MFA
-- [ ] Test all MFA factors in practice
 - [ ] Review security best practices for each component
 
 ---

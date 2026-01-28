@@ -827,6 +827,263 @@ if (email.endsWith('@acme.com')) {
 - Application handles tenant isolation
 - Simpler for small number of tenants
 
+## Auth0 SDKs by Application Type
+
+### SDK Selection Guide
+
+| Application Type | Recommended SDK | Alternative |
+|-----------------|-----------------|-------------|
+| **React SPA** | @auth0/auth0-react | auth0-spa-js |
+| **Angular SPA** | @auth0/auth0-angular | auth0-spa-js |
+| **Vue.js SPA** | auth0-spa-js + Vue plugin | - |
+| **Generic SPA** | @auth0/auth0-spa-js | - |
+| **Node.js Web App** | express-openid-connect | passport-auth0 |
+| **Python Web App** | authlib | python-social-auth |
+| **iOS Native** | Auth0.swift | - |
+| **Android Native** | Auth0.Android | - |
+| **React Native** | react-native-auth0 | - |
+| **Flutter** | auth0_flutter | - |
+
+### SPA SDK: auth0-spa-js
+
+**Best for**: Single Page Applications
+
+**Key Features**:
+- ✅ PKCE built-in (automatic)
+- ✅ Token caching and renewal
+- ✅ Silent authentication
+- ✅ TypeScript support
+- ✅ Small bundle size
+
+**Installation**:
+```bash
+npm install @auth0/auth0-spa-js
+```
+
+**Basic Usage**:
+```javascript
+import { createAuth0Client } from '@auth0/auth0-spa-js';
+
+const auth0 = await createAuth0Client({
+  domain: 'your-tenant.auth0.com',
+  clientId: 'your-client-id',
+  authorizationParams: {
+    redirect_uri: window.location.origin,
+    audience: 'https://api.myapp.com'
+  }
+});
+
+// Login
+await auth0.loginWithRedirect();
+
+// Handle callback
+await auth0.handleRedirectCallback();
+
+// Get access token
+const token = await auth0.getTokenSilently();
+
+// Get user info
+const user = await auth0.getUser();
+
+// Logout
+await auth0.logout({ 
+  logoutParams: { returnTo: window.location.origin }
+});
+```
+
+### React SDK: auth0-react
+
+**Best for**: React applications
+
+**Key Features**:
+- React hooks (useAuth0)
+- Context provider
+- Built on auth0-spa-js
+
+**Installation**:
+```bash
+npm install @auth0/auth0-react
+```
+
+**Basic Usage**:
+```jsx
+// App.js - Provider setup
+import { Auth0Provider } from '@auth0/auth0-react';
+
+<Auth0Provider
+  domain="your-tenant.auth0.com"
+  clientId="your-client-id"
+  authorizationParams={{
+    redirect_uri: window.location.origin,
+    audience: 'https://api.myapp.com'
+  }}
+>
+  <App />
+</Auth0Provider>
+
+// Component usage
+import { useAuth0 } from '@auth0/auth0-react';
+
+function Profile() {
+  const { 
+    isAuthenticated, 
+    isLoading, 
+    user, 
+    loginWithRedirect, 
+    logout,
+    getAccessTokenSilently 
+  } = useAuth0();
+
+  if (isLoading) return <div>Loading...</div>;
+  
+  if (!isAuthenticated) {
+    return <button onClick={() => loginWithRedirect()}>Login</button>;
+  }
+
+  return (
+    <div>
+      <img src={user.picture} alt={user.name} />
+      <h2>{user.name}</h2>
+      <button onClick={() => logout()}>Logout</button>
+    </div>
+  );
+}
+```
+
+### Mobile SDKs
+
+#### iOS (Swift)
+
+```swift
+import Auth0
+
+// Login
+Auth0
+    .webAuth()
+    .audience("https://api.myapp.com")
+    .scope("openid profile email")
+    .start { result in
+        switch result {
+        case .success(let credentials):
+            print("Access Token: \(credentials.accessToken)")
+        case .failure(let error):
+            print("Error: \(error)")
+        }
+    }
+
+// Logout
+Auth0
+    .webAuth()
+    .clearSession { result in
+        // Handle logout
+    }
+```
+
+#### Android (Kotlin)
+
+```kotlin
+import com.auth0.android.Auth0
+import com.auth0.android.authentication.AuthenticationException
+import com.auth0.android.provider.WebAuthProvider
+import com.auth0.android.callback.Callback
+import com.auth0.android.result.Credentials
+
+val auth0 = Auth0(clientId, domain)
+
+// Login
+WebAuthProvider.login(auth0)
+    .withScheme("demo")
+    .withAudience("https://api.myapp.com")
+    .start(this, object : Callback<Credentials, AuthenticationException> {
+        override fun onSuccess(credentials: Credentials) {
+            val accessToken = credentials.accessToken
+        }
+        override fun onFailure(error: AuthenticationException) {
+            // Handle error
+        }
+    })
+
+// Logout
+WebAuthProvider.logout(auth0)
+    .withScheme("demo")
+    .start(this, callback)
+```
+
+### Server-Side SDK: express-openid-connect
+
+**Best for**: Node.js Express applications
+
+**Key Features**:
+- Session management built-in
+- Server-side token handling
+- Middleware-based
+
+**Installation**:
+```bash
+npm install express-openid-connect
+```
+
+**Basic Usage**:
+```javascript
+const { auth, requiresAuth } = require('express-openid-connect');
+
+app.use(
+  auth({
+    authRequired: false,
+    auth0Logout: true,
+    secret: process.env.SESSION_SECRET,
+    baseURL: 'https://myapp.com',
+    clientID: 'your-client-id',
+    issuerBaseURL: 'https://your-tenant.auth0.com'
+  })
+);
+
+// Protected route
+app.get('/profile', requiresAuth(), (req, res) => {
+  res.send(JSON.stringify(req.oidc.user));
+});
+
+// Access token for API calls
+app.get('/api/data', requiresAuth(), async (req, res) => {
+  const { access_token } = await req.oidc.accessToken.get();
+  // Use access_token to call API
+});
+```
+
+### SDK Configuration Options
+
+#### Common Options
+
+| Option | Description | Example |
+|--------|-------------|---------|
+| `domain` | Auth0 tenant domain | `your-tenant.auth0.com` |
+| `clientId` | Application client ID | `abc123...` |
+| `redirect_uri` | Callback URL after login | `https://app.com/callback` |
+| `audience` | API identifier | `https://api.myapp.com` |
+| `scope` | OAuth scopes | `openid profile email` |
+
+#### SPA-Specific Options
+
+| Option | Description | Default |
+|--------|-------------|---------|
+| `useRefreshTokens` | Use refresh tokens | `false` |
+| `cacheLocation` | Token storage | `memory` |
+| `useRefreshTokensFallback` | Fallback to iframe | `true` |
+
+```javascript
+const auth0 = await createAuth0Client({
+  domain: 'your-tenant.auth0.com',
+  clientId: 'your-client-id',
+  useRefreshTokens: true,
+  cacheLocation: 'localstorage', // or 'memory'
+  authorizationParams: {
+    redirect_uri: window.location.origin,
+    audience: 'https://api.myapp.com',
+    scope: 'openid profile email offline_access'
+  }
+});
+```
+
 ## Application Configuration Best Practices
 
 ### Callback URLs

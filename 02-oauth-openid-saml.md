@@ -156,6 +156,86 @@ Resource Server checks scopes in token
 - `address` - Returns address claim
 - `phone` - Returns phone_number
 
+### OIDC Request Parameters
+
+#### prompt Parameter
+Controls authentication behavior:
+
+| Value | Behavior |
+|-------|----------|
+| `none` | Silent authentication - no UI shown, fails if auth required |
+| `login` | Force re-authentication even if session exists |
+| `consent` | Force consent prompt even if previously granted |
+| `select_account` | Show account selection even with single account |
+
+**Examples**:
+```
+# Silent auth - check if session exists
+GET /authorize?...&prompt=none
+
+# Force user to re-enter credentials
+GET /authorize?...&prompt=login
+
+# Combine values (space-separated)
+GET /authorize?...&prompt=login consent
+```
+
+**Silent Authentication (prompt=none)**:
+- Used to check if user has active session
+- Returns tokens silently if session valid
+- Fails with `login_required` error if no session
+- **Cannot work** with third-party cookies blocked
+- Common in SPAs for session check without redirect
+
+#### max_age Parameter
+- Forces re-authentication after specified seconds
+- `max_age=0` - Always force re-authentication (similar to `prompt=login`)
+- `max_age=3600` - Re-authenticate if last auth was > 1 hour ago
+- Returns `auth_time` claim in ID token to verify
+
+**Example**:
+```
+# Re-authenticate if last login was more than 5 minutes ago
+GET /authorize?...&max_age=300
+```
+
+**max_age vs prompt=login**:
+| max_age | prompt=login |
+|---------|--------------|
+| Re-auth if time exceeded | Always force re-auth |
+| Conditional based on time | Unconditional |
+| Returns auth_time claim | May not return auth_time |
+
+#### acr_values Parameter
+- Request specific Authentication Context Class Reference
+- Used for step-up authentication
+- Auth0 supports custom ACR values via Actions
+
+**Example**:
+```
+# Request MFA-based authentication
+GET /authorize?...&acr_values=http://schemas.openid.net/pape/policies/2007/06/multi-factor
+```
+
+#### login_hint Parameter
+- Pre-fill username/email in login form
+- Improves UX for known users
+- Does NOT skip authentication
+
+**Example**:
+```
+GET /authorize?...&login_hint=user@example.com
+```
+
+#### screen_hint Parameter (Auth0-specific)
+- Control which screen to show
+- `signup` - Show signup form instead of login
+
+**Example**:
+```
+GET /authorize?...&screen_hint=signup
+```
+
 ## SAML (Security Assertion Markup Language)
 
 ### What is SAML?
@@ -229,3 +309,9 @@ Resource Server checks scopes in token
 ✅ **Implicit Flow deprecated**, always use Authorization Code + PKCE  
 ✅ **openid scope** required to trigger OIDC and receive ID token  
 ✅ **OAuth components**: Resource Owner, Client, Authorization Server, Resource Server  
+✅ **prompt=none**: Silent authentication, no UI, fails if session required  
+✅ **prompt=login**: Force re-authentication even with active session  
+✅ **max_age**: Re-authenticate if time since last auth exceeds value  
+✅ **login_hint**: Pre-fill username, does NOT skip auth  
+✅ **screen_hint=signup**: Show signup form instead of login (Auth0-specific)  
+✅ **acr_values**: Request specific authentication level (e.g., MFA)  

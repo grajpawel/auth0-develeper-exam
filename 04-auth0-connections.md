@@ -122,6 +122,317 @@ Connect to your existing user database instead of migrating:
 - Provider-specific data in `identities` array
 - Can merge accounts from multiple social providers
 
+## Auth0 Normalized User Profile
+
+### What is the Normalized User Profile?
+
+Auth0 normalizes user data from different identity providers into a **consistent, standardized format**. This means regardless of whether a user logs in with Google, Facebook, SAML, or a database connection, your application receives user data in the same structure.
+
+### Why Normalization Matters
+
+**Without Normalization**:
+- Google returns `given_name` and `family_name`
+- Facebook returns `first_name` and `last_name`
+- SAML might return `FirstName` and `LastName`
+- Your app needs to handle every variation
+
+**With Auth0 Normalization**:
+- All providers map to `name`, `given_name`, `family_name`
+- Consistent structure regardless of source
+- Simplified application code
+- Single schema to work with
+
+### Normalized Profile Structure
+
+#### Core Attributes (Always Present)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `user_id` | String | Unique identifier (e.g., `auth0|507f1f77bcf86cd799439020`) |
+| `email` | String | User's email address |
+| `email_verified` | Boolean | Whether email has been verified |
+| `name` | String | Full name |
+| `picture` | String | URL to profile picture |
+| `nickname` | String | User's nickname or username |
+| `created_at` | String | Account creation timestamp |
+| `updated_at` | String | Last profile update timestamp |
+
+#### Optional Attributes (Provider-Dependent)
+
+| Attribute | Type | Description |
+|-----------|------|-------------|
+| `given_name` | String | First name |
+| `family_name` | String | Last name |
+| `phone_number` | String | Phone number |
+| `phone_verified` | Boolean | Phone verification status |
+| `locale` | String | User's locale (e.g., `en-US`) |
+| `username` | String | Username for database connections |
+
+### Identities Array
+
+The `identities` array contains information about all linked accounts:
+
+```json
+{
+  "user_id": "auth0|507f1f77bcf86cd799439020",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "picture": "https://example.com/photo.jpg",
+  "identities": [
+    {
+      "provider": "auth0",
+      "user_id": "507f1f77bcf86cd799439020",
+      "connection": "Username-Password-Authentication",
+      "isSocial": false
+    },
+    {
+      "provider": "google-oauth2",
+      "user_id": "115015401343387192503",
+      "connection": "google-oauth2",
+      "isSocial": true
+    }
+  ]
+}
+```
+
+#### Identity Object Properties
+
+| Property | Description |
+|----------|-------------|
+| `provider` | Identity provider name |
+| `user_id` | User ID from that provider |
+| `connection` | Auth0 connection name |
+| `isSocial` | Whether it's a social provider |
+| `access_token` | Provider's access token (if stored) |
+| `profileData` | Raw profile data from provider |
+
+### Provider-Specific Mapping
+
+#### Google
+```json
+// Google returns:
+{
+  "sub": "115015401343387192503",
+  "email": "user@gmail.com",
+  "given_name": "John",
+  "family_name": "Doe",
+  "picture": "https://lh3.googleusercontent.com/..."
+}
+
+// Auth0 normalizes to:
+{
+  "user_id": "google-oauth2|115015401343387192503",
+  "email": "user@gmail.com",
+  "name": "John Doe",
+  "given_name": "John",
+  "family_name": "Doe",
+  "picture": "https://lh3.googleusercontent.com/...",
+  "nickname": "user"
+}
+```
+
+#### Facebook
+```json
+// Facebook returns:
+{
+  "id": "10157820145678901",
+  "email": "user@example.com",
+  "first_name": "John",
+  "last_name": "Doe",
+  "picture": { "data": { "url": "https://..." } }
+}
+
+// Auth0 normalizes to:
+{
+  "user_id": "facebook|10157820145678901",
+  "email": "user@example.com",
+  "name": "John Doe",
+  "given_name": "John",
+  "family_name": "Doe",
+  "picture": "https://graph.facebook.com/...",
+  "nickname": "john.doe"
+}
+```
+
+#### SAML/Enterprise
+```xml
+<!-- SAML Assertion -->
+<Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress">
+  <AttributeValue>user@company.com</AttributeValue>
+</Attribute>
+<Attribute Name="http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname">
+  <AttributeValue>John</AttributeValue>
+</Attribute>
+```
+
+```json
+// Auth0 normalizes to:
+{
+  "user_id": "samlp|company-idp|john@company.com",
+  "email": "user@company.com",
+  "name": "John Doe",
+  "given_name": "John",
+  "family_name": "Doe"
+}
+```
+
+### User ID Format
+
+The `user_id` follows a specific format:
+```
+{identity-provider}|{unique-id}
+```
+
+**Examples**:
+- `auth0|507f1f77bcf86cd799439020` - Database connection
+- `google-oauth2|115015401343387192503` - Google
+- `facebook|10157820145678901` - Facebook
+- `samlp|company-idp|user@company.com` - SAML
+- `windowslive|user@outlook.com` - Microsoft
+
+### Accessing Normalized Profile
+
+#### In ID Token
+```json
+{
+  "sub": "auth0|507f1f77bcf86cd799439020",
+  "name": "John Doe",
+  "email": "user@example.com",
+  "email_verified": true,
+  "picture": "https://example.com/photo.jpg",
+  "nickname": "johnd",
+  "updated_at": "2024-01-15T10:30:00.000Z"
+}
+```
+
+#### Via Management API
+```javascript
+GET /api/v2/users/{user_id}
+
+// Response
+{
+  "user_id": "auth0|507f1f77bcf86cd799439020",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "John Doe",
+  "picture": "https://example.com/photo.jpg",
+  "nickname": "johnd",
+  "identities": [...],
+  "user_metadata": {...},
+  "app_metadata": {...}
+}
+```
+
+#### Via /userinfo Endpoint
+```javascript
+GET /userinfo
+Authorization: Bearer {access_token}
+
+// Response (OIDC standard claims)
+{
+  "sub": "auth0|507f1f77bcf86cd799439020",
+  "name": "John Doe",
+  "email": "user@example.com",
+  "email_verified": true,
+  "picture": "https://example.com/photo.jpg"
+}
+```
+
+### User Metadata vs App Metadata
+
+#### User Metadata
+- **Editable by user** (via profile forms)
+- Preferences, settings, personal info
+- Examples: timezone, language preference, theme
+
+```json
+"user_metadata": {
+  "preferences": {
+    "theme": "dark",
+    "language": "en",
+    "timezone": "America/New_York"
+  }
+}
+```
+
+#### App Metadata
+- **Only editable by application** (via Management API)
+- Not accessible to user
+- Examples: plan type, internal flags, authorization data
+
+```json
+"app_metadata": {
+  "plan": "enterprise",
+  "roles": ["admin", "user"],
+  "signup_source": "marketing_campaign"
+}
+```
+
+### Customizing Profile with Actions
+
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  // Add custom claims from normalized profile
+  api.idToken.setCustomClaim('https://myapp.com/email', event.user.email);
+  
+  // Access identities
+  const identities = event.user.identities || [];
+  const providers = identities.map(i => i.provider);
+  api.idToken.setCustomClaim('https://myapp.com/providers', providers);
+  
+  // Access metadata
+  const plan = event.user.app_metadata?.plan || 'free';
+  api.accessToken.setCustomClaim('https://myapp.com/plan', plan);
+};
+```
+
+### Attribute Mapping for Enterprise
+
+For SAML/OIDC enterprise connections, configure attribute mapping:
+
+**Dashboard Configuration**:
+1. Go to **Authentication** → **Enterprise**
+2. Select connection
+3. Go to **Mappings** tab
+4. Map IdP attributes to Auth0 profile
+
+**Common Mappings**:
+```json
+{
+  "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+  "name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+  "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+  "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+  "groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+}
+```
+
+### Best Practices
+
+✅ **Use normalized attributes** in your application
+- Don't rely on provider-specific fields
+- Access `name`, `email`, `picture` consistently
+
+✅ **Store custom data in metadata**
+- User preferences → `user_metadata`
+- Application data → `app_metadata`
+- Don't modify core profile attributes
+
+✅ **Handle missing attributes gracefully**
+- Not all providers return all fields
+- Check for null/undefined values
+- Provide default values
+
+✅ **Use Actions for custom claims**
+- Enrich tokens with additional data
+- Map metadata to token claims
+- Keep tokens minimal
+
+✅ **Configure enterprise attribute mapping**
+- Ensure SAML/OIDC attributes map correctly
+- Test with sample assertions
+- Document mapping decisions
+
 ## Enterprise Connections
 
 ### What are Enterprise Connections?
@@ -330,6 +641,249 @@ PATCH /api/v2/users/{primary_user_id}
 ✅ Audit account linking events  
 ⚠️ Never auto-link without verification (security risk)  
 
+## User Provisioning
+
+### Just-In-Time (JIT) Provisioning
+
+#### What is JIT Provisioning?
+
+**Just-In-Time provisioning** automatically creates user accounts in Auth0 when users first authenticate through an enterprise IdP (SAML, OIDC):
+
+- User doesn't need to exist in Auth0 beforehand
+- Account created on first SSO login
+- Profile data populated from IdP assertions
+
+#### How JIT Works
+
+```
+User first login attempt via SAML/OIDC
+    ↓
+IdP authenticates user
+    ↓
+IdP sends assertion to Auth0
+    ↓
+Auth0 checks: Does user exist?
+    ↓
+No → Create user with IdP attributes
+    ↓
+Auth0 completes authentication
+```
+
+#### JIT Configuration
+
+**Enabled by default** for enterprise connections. Configure attribute mapping to populate profile:
+
+**Dashboard → Authentication → Enterprise → [Connection] → Mappings**
+
+```json
+{
+  "email": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/emailaddress",
+  "name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/name",
+  "given_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/givenname",
+  "family_name": "http://schemas.xmlsoap.org/ws/2005/05/identity/claims/surname",
+  "groups": "http://schemas.microsoft.com/ws/2008/06/identity/claims/groups"
+}
+```
+
+#### JIT with Actions
+
+Enhance JIT with post-login Actions:
+
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  // Check if this is first login (JIT created user)
+  if (event.stats.logins_count === 1) {
+    // First login - send welcome email
+    await sendWelcomeEmail(event.user.email);
+    
+    // Set initial metadata
+    api.user.setAppMetadata('onboarded', false);
+    api.user.setAppMetadata('signup_source', 'enterprise_sso');
+    
+    // Assign default role (would use Management API)
+    api.accessToken.setCustomClaim('https://myapp.com/new_user', true);
+  }
+};
+```
+
+#### JIT Benefits
+
+✅ **No pre-provisioning** required  
+✅ **Reduced admin work** (no manual user creation)  
+✅ **Profile sync** on each login  
+✅ **Self-service** for enterprise users  
+
+#### JIT Limitations
+
+❌ No user exists until first login  
+❌ Can't assign roles/permissions before first login  
+❌ Limited to IdP-provided attributes  
+❌ No deprovisioning (user removal)  
+
+### SCIM (System for Cross-domain Identity Management)
+
+#### What is SCIM?
+
+**SCIM** is a standardized protocol for **automated user provisioning and deprovisioning**:
+
+- Create users before they log in
+- Update user attributes automatically
+- Deactivate/delete users when they leave
+- Sync groups/roles from IdP
+
+#### SCIM vs JIT Provisioning
+
+| Feature | JIT Provisioning | SCIM |
+|---------|-----------------|------|
+| **User Creation** | On first login | Before first login |
+| **Pre-provisioning** | ❌ No | ✅ Yes |
+| **Deprovisioning** | ❌ No | ✅ Yes |
+| **Attribute Updates** | On login only | Real-time sync |
+| **Group Sync** | Limited | ✅ Full support |
+| **Complexity** | Simple | More complex |
+| **Use Case** | Basic SSO | Full lifecycle |
+
+#### SCIM in Auth0
+
+Auth0 supports SCIM for **inbound provisioning** (IdP → Auth0):
+
+**Supported IdPs**:
+- Okta
+- Azure AD
+- OneLogin
+- Ping Identity
+- Other SCIM 2.0 compliant providers
+
+#### SCIM Setup
+
+**Dashboard → Authentication → Enterprise → [Connection] → Provisioning**
+
+1. Enable SCIM provisioning
+2. Generate SCIM endpoint URL
+3. Generate bearer token
+4. Configure IdP with Auth0 SCIM endpoint
+
+**Auth0 SCIM Endpoint**:
+```
+https://{tenant}.auth0.com/scim/v2/{connection_id}
+```
+
+#### SCIM Operations
+
+##### Create User
+```http
+POST /scim/v2/{connection_id}/Users
+Authorization: Bearer {token}
+Content-Type: application/scim+json
+
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:User"],
+  "userName": "john.doe@example.com",
+  "name": {
+    "givenName": "John",
+    "familyName": "Doe"
+  },
+  "emails": [{
+    "value": "john.doe@example.com",
+    "primary": true
+  }],
+  "active": true
+}
+```
+
+##### Update User
+```http
+PATCH /scim/v2/{connection_id}/Users/{user_id}
+Authorization: Bearer {token}
+Content-Type: application/scim+json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [{
+    "op": "replace",
+    "path": "name.givenName",
+    "value": "Jonathan"
+  }]
+}
+```
+
+##### Deactivate User
+```http
+PATCH /scim/v2/{connection_id}/Users/{user_id}
+Authorization: Bearer {token}
+Content-Type: application/scim+json
+
+{
+  "schemas": ["urn:ietf:params:scim:api:messages:2.0:PatchOp"],
+  "Operations": [{
+    "op": "replace",
+    "path": "active",
+    "value": false
+  }]
+}
+```
+
+##### Delete User
+```http
+DELETE /scim/v2/{connection_id}/Users/{user_id}
+Authorization: Bearer {token}
+```
+
+#### SCIM Attribute Mapping
+
+Map SCIM attributes to Auth0 profile:
+
+```json
+{
+  "user_id": "externalId",
+  "email": "emails[type eq \"work\"].value",
+  "name": "displayName",
+  "given_name": "name.givenName",
+  "family_name": "name.familyName",
+  "app_metadata.department": "urn:ietf:params:scim:schemas:extension:enterprise:2.0:User:department"
+}
+```
+
+#### Group Provisioning
+
+SCIM can sync groups from IdP:
+
+```http
+POST /scim/v2/{connection_id}/Groups
+{
+  "schemas": ["urn:ietf:params:scim:schemas:core:2.0:Group"],
+  "displayName": "Engineering",
+  "members": [
+    {"value": "user_id_1"},
+    {"value": "user_id_2"}
+  ]
+}
+```
+
+#### SCIM Best Practices
+
+✅ **Use HTTPS** for all SCIM endpoints  
+✅ **Secure bearer token** and rotate periodically  
+✅ **Map required attributes** properly  
+✅ **Test with small group** before full rollout  
+✅ **Monitor provisioning logs** for errors  
+✅ **Handle deprovisioning** (block vs delete)  
+
+### When to Use Each
+
+#### Use JIT Provisioning When:
+- ✅ Simple SSO integration
+- ✅ No need for pre-provisioning
+- ✅ Deprovisioning not critical
+- ✅ Quick implementation needed
+
+#### Use SCIM When:
+- ✅ Full user lifecycle management needed
+- ✅ Users must exist before first login
+- ✅ Automatic deprovisioning required
+- ✅ Group/role sync needed
+- ✅ Compliance requires account disable on termination
+
 ## Key Exam Takeaways
 
 ✅ **Four connection types**: Database, Social, Enterprise, Passwordless  
@@ -344,3 +898,17 @@ PATCH /api/v2/users/{primary_user_id}
 ✅ **OIDC**: JSON-based, modern alternative to SAML  
 ✅ **Social provider keys**: Use your own for production, not Auth0 dev keys  
 ✅ **AD/LDAP connector**: On-premises agent required for direct AD integration  
+✅ **Normalized User Profile**: Auth0 standardizes user data from all providers  
+✅ **user_id format**: `{provider}|{unique-id}` (e.g., `google-oauth2|123456`)  
+✅ **Identities array**: Contains all linked accounts with provider-specific data  
+✅ **Core attributes**: `user_id`, `email`, `name`, `picture`, `nickname` always present  
+✅ **user_metadata**: User-editable data (preferences, settings)  
+✅ **app_metadata**: Application-only data (plan, roles, internal flags)  
+✅ **Attribute mapping**: Configure for SAML/enterprise connections  
+✅ **/userinfo endpoint**: Returns normalized OIDC claims for authenticated user  
+✅ **JIT Provisioning**: Auto-create users on first SSO login  
+✅ **SCIM**: Standardized protocol for user provisioning/deprovisioning  
+✅ **JIT vs SCIM**: JIT = simple/on-login, SCIM = full lifecycle management  
+✅ **SCIM operations**: Create, Update, Deactivate, Delete users  
+✅ **SCIM deprovisioning**: Can block or delete users when removed from IdP  
+✅ **Group sync**: SCIM supports syncing groups from IdP to Auth0  
