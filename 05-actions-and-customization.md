@@ -99,8 +99,124 @@ Contains information about the authentication:
 - `event.user` - User profile
 - `event.client` - Application details
 - `event.connection` - Connection used
-- `event.request` - Request metadata (IP, user agent, etc.)
+- `event.request` - Request metadata (IP, user agent, geoip, etc.)
 - `event.transaction` - Transaction context
+- `event.organization` - Organization context (if applicable)
+- `event.authentication` - Authentication details (methods used)
+
+#### `event.request` Object Details
+
+The `event.request` object contains rich information about the authentication request:
+
+```javascript
+event.request = {
+  ip: "192.168.1.1",              // Client IP address
+  hostname: "your-tenant.auth0.com",
+  method: "POST",
+  user_agent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64)...",
+  language: "en-US,en;q=0.9",
+  body: {},                        // Request body (limited)
+  query: {},                       // Query parameters
+  geoip: {                         // GeoIP data (see below)
+    countryCode: "US",
+    countryCode3: "USA",
+    countryName: "United States",
+    cityName: "San Francisco",
+    latitude: 37.7749,
+    longitude: -122.4194,
+    timeZone: "America/Los_Angeles",
+    continentCode: "NA"
+  }
+}
+```
+
+#### GeoIP Object (`event.request.geoip`)
+
+Auth0 automatically resolves the client's IP address to geographic location data:
+
+| Property | Type | Description | Example |
+|----------|------|-------------|---------|
+| `countryCode` | String | ISO 3166-1 alpha-2 country code | `"US"` |
+| `countryCode3` | String | ISO 3166-1 alpha-3 country code | `"USA"` |
+| `countryName` | String | Full country name | `"United States"` |
+| `cityName` | String | City name | `"San Francisco"` |
+| `latitude` | Number | Latitude coordinate | `37.7749` |
+| `longitude` | Number | Longitude coordinate | `-122.4194` |
+| `timeZone` | String | IANA timezone | `"America/Los_Angeles"` |
+| `continentCode` | String | Continent code | `"NA"` (North America) |
+| `subdivisionCode` | String | State/province code | `"CA"` (California) |
+| `subdivisionName` | String | State/province name | `"California"` |
+
+**Continent Codes**:
+| Code | Continent |
+|------|-----------|
+| `AF` | Africa |
+| `AN` | Antarctica |
+| `AS` | Asia |
+| `EU` | Europe |
+| `NA` | North America |
+| `OC` | Oceania |
+| `SA` | South America |
+
+**GeoIP Usage Examples**:
+
+```javascript
+exports.onExecutePostLogin = async (event, api) => {
+  const geoip = event.request.geoip;
+  
+  // 1. Block specific countries
+  const blockedCountries = ['XX', 'YY', 'ZZ'];
+  if (blockedCountries.includes(geoip.countryCode)) {
+    api.access.deny('Access not allowed from your location');
+    return;
+  }
+  
+  // 2. Require MFA for unusual locations
+  const userCountry = event.user.app_metadata?.usual_country;
+  if (userCountry && geoip.countryCode !== userCountry) {
+    api.multifactor.enable('any');
+  }
+  
+  // 3. Add location to token for auditing
+  api.accessToken.setCustomClaim('https://myapp.com/location', {
+    country: geoip.countryCode,
+    city: geoip.cityName,
+    timezone: geoip.timeZone
+  });
+  
+  // 4. Detect impossible travel
+  const lastLoginLocation = event.user.app_metadata?.last_location;
+  const lastLoginTime = event.user.app_metadata?.last_login_time;
+  
+  if (lastLoginLocation && lastLoginTime) {
+    const distance = calculateDistance(
+      lastLoginLocation.lat, lastLoginLocation.lon,
+      geoip.latitude, geoip.longitude
+    );
+    const timeDiff = (Date.now() - lastLoginTime) / 1000 / 3600; // hours
+    const speed = distance / timeDiff; // km/h
+    
+    if (speed > 1000) { // Impossible travel (faster than airplane)
+      api.multifactor.enable('any');
+      console.log('Impossible travel detected');
+    }
+  }
+  
+  // 5. Store current location for next comparison
+  api.user.setAppMetadata('last_location', {
+    lat: geoip.latitude,
+    lon: geoip.longitude,
+    country: geoip.countryCode
+  });
+  api.user.setAppMetadata('last_login_time', Date.now());
+};
+```
+
+**GeoIP Limitations**:
+- ⚠️ IP-based geolocation is not 100% accurate
+- ⚠️ VPNs and proxies can mask true location
+- ⚠️ Mobile users may show carrier location, not actual
+- ⚠️ Some fields may be null for certain IPs (e.g., `cityName`)
 
 #### `api` Object
 Methods to modify the flow:
@@ -615,6 +731,10 @@ Auth0 uses Liquid templating for emails:
 ✅ **credentials-exchange**: For M2M flows only  
 ✅ **Actions API**: api.access.deny(), api.idToken.setCustomClaim(), api.multifactor.enable()  
 ✅ **Secrets**: Max 100 per action, stored encrypted  
+✅ **event.request**: Contains IP, user_agent, hostname, query, geoip  
+✅ **event.request.geoip**: Geographic data from IP (countryCode, cityName, latitude, longitude, timeZone)  
+✅ **GeoIP fields**: countryCode (2-letter), countryCode3 (3-letter), cityName, subdivisionCode (state)  
+✅ **GeoIP use cases**: Block countries, detect unusual locations, impossible travel detection  
 ✅ **Custom domains**: Improves branding, requires DNS CNAME, Auth0 can manage SSL  
 ✅ **Error pages**: Shown on auth failures, customizable via Dashboard  
 ✅ **Custom error pages**: Edit HTML template, use @@CONFIG@@ for error details  

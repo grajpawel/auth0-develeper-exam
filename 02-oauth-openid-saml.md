@@ -297,6 +297,200 @@ GET /authorize?...&screen_hint=signup
 - Developer-friendly
 - Microservices
 
+## Auth0 Endpoints Reference
+
+### OAuth 2.0 / OIDC Endpoints
+
+| Endpoint | Purpose | Method |
+|----------|---------|--------|
+| `/authorize` | Start authorization flow | GET |
+| `/oauth/token` | Exchange code for tokens, refresh tokens, client credentials | POST |
+| `/oauth/revoke` | Revoke refresh token | POST |
+| `/userinfo` | Get user info with access token | GET |
+| `/v2/logout` | End Auth0 session | GET |
+| `/oidc/logout` | OIDC-compliant logout | GET |
+| `/.well-known/openid-configuration` | Discovery document | GET |
+| `/.well-known/jwks.json` | JSON Web Key Set for signature verification | GET |
+
+### Authorization Endpoint (`/authorize`)
+
+**Purpose**: Start the OAuth 2.0 / OIDC authorization flow
+
+```
+GET https://{tenant}.auth0.com/authorize?
+  response_type=code
+  &client_id={CLIENT_ID}
+  &redirect_uri={REDIRECT_URI}
+  &scope=openid profile email
+  &state={STATE}
+  &code_challenge={PKCE_CHALLENGE}
+  &code_challenge_method=S256
+  &audience={API_IDENTIFIER}
+  &prompt=none|login|consent
+  &max_age={SECONDS}
+  &login_hint={EMAIL}
+  &screen_hint=signup
+  &organization={ORG_ID}
+  &invitation={INVITATION_TICKET}
+```
+
+**Key Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `response_type` | Yes | `code` for Auth Code flow |
+| `client_id` | Yes | Your application's client ID |
+| `redirect_uri` | Yes | Callback URL (must match configured) |
+| `scope` | Yes | Requested scopes (include `openid` for OIDC) |
+| `state` | Recommended | CSRF protection, returned in callback |
+| `nonce` | Recommended | Replay protection for ID token |
+| `code_challenge` | Required for PKCE | SHA256 of code_verifier |
+| `code_challenge_method` | Required for PKCE | Always `S256` |
+| `audience` | Optional | API identifier for access token |
+| `connection` | Optional | Force specific connection |
+
+### Token Endpoint (`/oauth/token`)
+
+**Purpose**: Exchange authorization code for tokens, refresh tokens, or get tokens via client credentials
+
+**Authorization Code Exchange**:
+```http
+POST https://{tenant}.auth0.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=authorization_code
+&client_id={CLIENT_ID}
+&client_secret={CLIENT_SECRET}  # Only for confidential clients
+&code={AUTHORIZATION_CODE}
+&redirect_uri={REDIRECT_URI}
+&code_verifier={PKCE_VERIFIER}  # For PKCE flow
+```
+
+**Refresh Token Exchange**:
+```http
+POST https://{tenant}.auth0.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=refresh_token
+&client_id={CLIENT_ID}
+&client_secret={CLIENT_SECRET}  # Only for confidential clients
+&refresh_token={REFRESH_TOKEN}
+```
+
+**Client Credentials (M2M)**:
+```http
+POST https://{tenant}.auth0.com/oauth/token
+Content-Type: application/x-www-form-urlencoded
+
+grant_type=client_credentials
+&client_id={CLIENT_ID}
+&client_secret={CLIENT_SECRET}
+&audience={API_IDENTIFIER}
+```
+
+**Response**:
+```json
+{
+  "access_token": "eyJ...",
+  "id_token": "eyJ...",
+  "token_type": "Bearer",
+  "expires_in": 86400,
+  "refresh_token": "v1.abc...",
+  "scope": "openid profile email"
+}
+```
+
+### Revoke Endpoint (`/oauth/revoke`)
+
+**Purpose**: Revoke a refresh token
+
+```http
+POST https://{tenant}.auth0.com/oauth/revoke
+Content-Type: application/x-www-form-urlencoded
+
+client_id={CLIENT_ID}
+&client_secret={CLIENT_SECRET}  # Only for confidential clients
+&token={REFRESH_TOKEN}
+```
+
+**Note**: Only refresh tokens can be revoked. Access tokens cannot be revoked (they expire naturally).
+
+### UserInfo Endpoint (`/userinfo`)
+
+**Purpose**: Get user profile information using an access token
+
+```http
+GET https://{tenant}.auth0.com/userinfo
+Authorization: Bearer {ACCESS_TOKEN}
+```
+
+**Response** (depends on scopes):
+```json
+{
+  "sub": "auth0|507f1f77bcf86cd799439020",
+  "name": "John Doe",
+  "email": "john@example.com",
+  "email_verified": true,
+  "picture": "https://example.com/photo.jpg"
+}
+```
+
+**Required Scopes**:
+| Scope | Returns |
+|-------|---------|
+| `openid` | `sub` claim |
+| `profile` | `name`, `nickname`, `picture` |
+| `email` | `email`, `email_verified` |
+| `phone` | `phone_number`, `phone_number_verified` |
+
+### Discovery Document (`/.well-known/openid-configuration`)
+
+**Purpose**: OIDC discovery document with all endpoint URLs
+
+```http
+GET https://{tenant}.auth0.com/.well-known/openid-configuration
+```
+
+**Response includes**:
+- `authorization_endpoint`
+- `token_endpoint`
+- `userinfo_endpoint`
+- `jwks_uri`
+- `issuer`
+- `scopes_supported`
+- `response_types_supported`
+
+### JWKS Endpoint (`/.well-known/jwks.json`)
+
+**Purpose**: Public keys for verifying token signatures
+
+```http
+GET https://{tenant}.auth0.com/.well-known/jwks.json
+```
+
+**Response**:
+```json
+{
+  "keys": [
+    {
+      "kty": "RSA",
+      "kid": "abc123",
+      "use": "sig",
+      "alg": "RS256",
+      "n": "...",
+      "e": "AQAB"
+    }
+  ]
+}
+```
+
+### SAML Endpoints
+
+| Endpoint | Purpose |
+|----------|---------|
+| `/samlp/{CLIENT_ID}` | SAML SSO endpoint (IdP) |
+| `/samlp/{CLIENT_ID}/logout` | SAML Single Logout |
+| `/samlp/metadata/{CLIENT_ID}` | SAML metadata document |
+
 ## Key Exam Takeaways
 
 ✅ **OAuth 2.0 = Authorization**, OIDC = Authentication, SAML = Enterprise SSO  
@@ -315,3 +509,13 @@ GET /authorize?...&screen_hint=signup
 ✅ **login_hint**: Pre-fill username, does NOT skip auth  
 ✅ **screen_hint=signup**: Show signup form instead of login (Auth0-specific)  
 ✅ **acr_values**: Request specific authentication level (e.g., MFA)  
+✅ **/authorize endpoint**: Start OAuth/OIDC flow, GET request  
+✅ **/oauth/token endpoint**: Exchange code for tokens, POST request  
+✅ **/oauth/revoke endpoint**: Revoke refresh token only (not access token)  
+✅ **/userinfo endpoint**: Get user profile with access token  
+✅ **/.well-known/openid-configuration**: OIDC discovery document  
+✅ **/.well-known/jwks.json**: Public keys for token signature verification  
+✅ **/samlp/{client_id}**: SAML SSO endpoint  
+✅ **/samlp/{client_id}/logout**: SAML Single Logout endpoint  
+✅ **state parameter**: CSRF protection, returned in callback  
+✅ **nonce parameter**: Replay protection for ID token  

@@ -340,8 +340,9 @@ Authorization: Bearer {access_token}
 
 ### User Metadata vs App Metadata
 
-#### User Metadata
+#### User Metadata (`user_metadata`)
 - **Editable by user** (via profile forms)
+- Accessible to the user
 - Preferences, settings, personal info
 - Examples: timezone, language preference, theme
 
@@ -351,21 +352,165 @@ Authorization: Bearer {access_token}
     "theme": "dark",
     "language": "en",
     "timezone": "America/New_York"
+  },
+  "profile": {
+    "company": "Acme Corp",
+    "job_title": "Developer"
   }
 }
 ```
 
-#### App Metadata
+**Updating via SDK**:
+```javascript
+// User can update their own metadata
+await auth0.patchUserAttributes(userId, {
+  user_metadata: {
+    preferences: { theme: 'light' }
+  }
+});
+```
+
+#### App Metadata (`app_metadata`)
 - **Only editable by application** (via Management API)
-- Not accessible to user
-- Examples: plan type, internal flags, authorization data
+- **Not accessible to user** (hidden from profile)
+- Authorization data, internal flags
+- Examples: plan type, roles, internal IDs
 
 ```json
 "app_metadata": {
   "plan": "enterprise",
-  "roles": ["admin", "user"],
-  "signup_source": "marketing_campaign"
+  "roles": ["admin", "billing"],
+  "signup_source": "marketing_campaign",
+  "stripe_customer_id": "cus_abc123",
+  "organization_id": "org_xyz789",
+  "permissions": ["read:reports", "write:users"],
+  "blocked": false,
+  "mfa_required": true
 }
+```
+
+**Updating via Management API**:
+```javascript
+// Only application can update app_metadata
+await management.users.update(
+  { id: userId },
+  { app_metadata: { plan: 'premium' } }
+);
+```
+
+#### Metadata Comparison
+
+| Feature | user_metadata | app_metadata |
+|---------|--------------|--------------|
+| **Who can edit** | User or application | Application only |
+| **Visible to user** | Yes | No |
+| **Use case** | Preferences, settings | Authorization, internal data |
+| **Size limit** | 16 KB | 16 KB |
+| **In ID token by default** | No | No |
+| **Access in Actions** | `event.user.user_metadata` | `event.user.app_metadata` |
+
+#### Metadata Limits
+
+| Limit | Value |
+|-------|-------|
+| `user_metadata` size | 16 KB max |
+| `app_metadata` size | 16 KB max |
+| Total user profile | 64 KB max |
+| Nested depth | Recommended: 3 levels |
+| Field name length | 255 characters |
+
+**Important**: Metadata is **not searchable** by default. For searchable data, consider using a separate database.
+
+### Complete User Profile Structure
+
+```json
+{
+  // Core attributes (always present)
+  "user_id": "auth0|507f1f77bcf86cd799439020",
+  "email": "user@example.com",
+  "email_verified": true,
+  "name": "John Doe",
+  "nickname": "johnd",
+  "picture": "https://example.com/photo.jpg",
+  "created_at": "2024-01-01T00:00:00.000Z",
+  "updated_at": "2024-01-15T10:30:00.000Z",
+  
+  // Optional attributes (provider-dependent)
+  "given_name": "John",
+  "family_name": "Doe",
+  "phone_number": "+1234567890",
+  "phone_verified": true,
+  "username": "johndoe",
+  "locale": "en-US",
+  
+  // Login tracking
+  "last_login": "2024-01-15T10:30:00.000Z",
+  "last_ip": "192.168.1.1",
+  "logins_count": 42,
+  
+  // Identities (linked accounts)
+  "identities": [
+    {
+      "provider": "auth0",
+      "user_id": "507f1f77bcf86cd799439020",
+      "connection": "Username-Password-Authentication",
+      "isSocial": false
+    },
+    {
+      "provider": "google-oauth2",
+      "user_id": "115015401343387192503",
+      "connection": "google-oauth2",
+      "isSocial": true,
+      "profileData": {
+        "email": "user@gmail.com",
+        "email_verified": true,
+        "name": "John Doe",
+        "given_name": "John",
+        "family_name": "Doe",
+        "picture": "https://lh3.googleusercontent.com/..."
+      }
+    }
+  ],
+  
+  // Custom metadata
+  "user_metadata": {
+    "preferences": { "theme": "dark" }
+  },
+  "app_metadata": {
+    "roles": ["admin"],
+    "plan": "enterprise"
+  },
+  
+  // MFA (if enrolled)
+  "multifactor": ["guardian"],
+  
+  // Blocked status
+  "blocked": false
+}
+```
+
+### Fields Available in Different Contexts
+
+| Field | ID Token | /userinfo | Management API | Actions |
+|-------|----------|-----------|----------------|---------|
+| `sub` / `user_id` | ✅ | ✅ | ✅ | ✅ |
+| `email` | ✅ | ✅ | ✅ | ✅ |
+| `email_verified` | ✅ | ✅ | ✅ | ✅ |
+| `name` | ✅ | ✅ | ✅ | ✅ |
+| `picture` | ✅ | ✅ | ✅ | ✅ |
+| `nickname` | ✅ | ✅ | ✅ | ✅ |
+| `given_name` | ✅* | ✅* | ✅ | ✅ |
+| `family_name` | ✅* | ✅* | ✅ | ✅ |
+| `identities` | ❌ | ❌ | ✅ | ✅ |
+| `user_metadata` | ❌** | ❌ | ✅ | ✅ |
+| `app_metadata` | ❌** | ❌ | ✅ | ✅ |
+| `logins_count` | ❌ | ❌ | ✅ | ✅ |
+| `last_login` | ❌ | ❌ | ✅ | ✅ |
+| `last_ip` | ❌ | ❌ | ✅ | ✅ |
+| `blocked` | ❌ | ❌ | ✅ | ✅ |
+
+*Requires `profile` scope  
+**Can be added via Actions using `setCustomClaim()`
 ```
 
 ### Customizing Profile with Actions
@@ -902,10 +1047,13 @@ POST /scim/v2/{connection_id}/Groups
 ✅ **user_id format**: `{provider}|{unique-id}` (e.g., `google-oauth2|123456`)  
 ✅ **Identities array**: Contains all linked accounts with provider-specific data  
 ✅ **Core attributes**: `user_id`, `email`, `name`, `picture`, `nickname` always present  
-✅ **user_metadata**: User-editable data (preferences, settings)  
-✅ **app_metadata**: Application-only data (plan, roles, internal flags)  
+✅ **user_metadata**: User-editable data (preferences), 16 KB limit  
+✅ **app_metadata**: Application-only data (roles, plan), not visible to user, 16 KB limit  
+✅ **Metadata in tokens**: Not included by default, add via Actions `setCustomClaim()`  
+✅ **Total profile size**: 64 KB max for entire user object  
 ✅ **Attribute mapping**: Configure for SAML/enterprise connections  
 ✅ **/userinfo endpoint**: Returns normalized OIDC claims for authenticated user  
+✅ **last_login, logins_count**: Tracking fields available in Management API  
 ✅ **JIT Provisioning**: Auto-create users on first SSO login  
 ✅ **SCIM**: Standardized protocol for user provisioning/deprovisioning  
 ✅ **JIT vs SCIM**: JIT = simple/on-login, SCIM = full lifecycle management  

@@ -126,6 +126,117 @@ https://YOUR_DOMAIN/v2/logout?
 - Security requirement
 - Shared/public computer
 
+### Logout Endpoints
+
+Auth0 provides several logout endpoints depending on the protocol:
+
+#### OIDC Logout Endpoint
+
+**Standard OIDC Logout**:
+```
+GET https://{YOUR_DOMAIN}/oidc/logout?
+  id_token_hint={ID_TOKEN}&
+  post_logout_redirect_uri={REDIRECT_URI}&
+  state={STATE}
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `id_token_hint` | Recommended | The ID token from authentication |
+| `post_logout_redirect_uri` | Optional | Where to redirect after logout |
+| `state` | Optional | State parameter returned in redirect |
+| `client_id` | Optional | Client ID (if id_token_hint not provided) |
+
+**Example**:
+```javascript
+// OIDC-compliant logout
+const logoutUrl = `https://${domain}/oidc/logout?` +
+  `id_token_hint=${idToken}&` +
+  `post_logout_redirect_uri=${encodeURIComponent(returnTo)}`;
+
+window.location.href = logoutUrl;
+```
+
+#### Auth0 v2 Logout Endpoint
+
+**Auth0-specific logout** (most commonly used):
+```
+GET https://{YOUR_DOMAIN}/v2/logout?
+  client_id={CLIENT_ID}&
+  returnTo={RETURN_URL}&
+  federated
+```
+
+**Parameters**:
+| Parameter | Required | Description |
+|-----------|----------|-------------|
+| `client_id` | Yes | Your application's client ID |
+| `returnTo` | Optional | URL to redirect after logout (must be in Allowed Logout URLs) |
+| `federated` | Optional | Include to trigger federated logout (IdP session) |
+
+**Example**:
+```javascript
+// Auth0 v2 logout
+const logoutUrl = `https://${domain}/v2/logout?` +
+  `client_id=${clientId}&` +
+  `returnTo=${encodeURIComponent(window.location.origin)}`;
+
+window.location.href = logoutUrl;
+```
+
+#### SAML Logout Endpoint
+
+**SAML Single Logout (SLO)**:
+```
+GET/POST https://{YOUR_DOMAIN}/samlp/{CLIENT_ID}/logout
+```
+
+**Logout Request (SP-Initiated)**:
+```xml
+<samlp:LogoutRequest
+  xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
+  ID="_logout_request_id"
+  Version="2.0"
+  IssueInstant="2024-01-15T10:00:00Z"
+  Destination="https://your-tenant.auth0.com/samlp/YOUR_CLIENT_ID/logout">
+  <saml:Issuer>https://your-app.com</saml:Issuer>
+  <saml:NameID>user@example.com</saml:NameID>
+</samlp:LogoutRequest>
+```
+
+**SAML Logout Configuration**:
+1. Enable SAML addon for your application
+2. Configure Single Logout Service URL in SAML settings
+3. Exchange metadata with IdP
+
+**SP-Initiated vs IdP-Initiated**:
+| Type | Flow | Use Case |
+|------|------|----------|
+| **SP-Initiated** | App → Auth0 → IdP | User clicks logout in your app |
+| **IdP-Initiated** | IdP → Auth0 → App | User logs out from corporate portal |
+
+#### Endpoint Comparison
+
+| Endpoint | Protocol | When to Use |
+|----------|----------|-------------|
+| `/v2/logout` | Auth0-specific | Most common, simple logout |
+| `/oidc/logout` | OIDC-compliant | Standards compliance, id_token_hint |
+| `/samlp/{client}/logout` | SAML 2.0 | Enterprise SAML applications |
+
+#### Logout URL Configuration
+
+**Important**: The `returnTo` or `post_logout_redirect_uri` must be configured in:
+- **Application Settings** → **Allowed Logout URLs**
+- Tenant-level logout URLs (for all apps)
+
+```javascript
+// Allowed Logout URLs in Auth0 Dashboard:
+// https://myapp.com
+// https://myapp.com/logged-out
+// http://localhost:3000 (for development)
+```
+
 #### 3. Federated Logout
 
 **What it does**:
@@ -579,6 +690,10 @@ app.get('/api/data', (req, res) => {
 ✅ **Global logout**: Revoke all tokens/sessions across all devices  
 ✅ **SSO session default**: 3 days inactivity, 7 days absolute  
 ✅ **returnTo parameter**: Must be in Allowed Logout URLs  
+✅ **/v2/logout endpoint**: Auth0-specific, most common, uses client_id + returnTo  
+✅ **/oidc/logout endpoint**: OIDC-compliant, uses id_token_hint + post_logout_redirect_uri  
+✅ **/samlp/{client_id}/logout**: SAML Single Logout, enterprise SSO  
+✅ **SAML SLO**: SP-Initiated (app starts) vs IdP-Initiated (IdP starts)  
 ✅ **Single tenancy**: One Auth0 tenant per customer, complete isolation  
 ✅ **Multi-tenancy**: Single tenant, multiple organizations, logical isolation  
 ✅ **Auth0 Organizations**: Native multi-tenancy feature, recommended approach  

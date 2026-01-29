@@ -26,6 +26,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - **OIDC Request Parameters** (prompt, max_age, acr_values, login_hint, screen_hint)
 - ID Tokens vs Access Tokens
 - SAML (Security Assertion Markup Language)
+- **Auth0 Endpoints Reference** (/authorize, /oauth/token, /oauth/revoke, /userinfo, /samlp)
 - When to use OAuth 2.0 vs OIDC vs SAML
 
 ### [03 - Tokens and Security](./03-tokens-and-security.md)
@@ -54,6 +55,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Action Specifications (Node.js 18, 20s timeout, 5MB size limit)
 - Action Triggers (post-login, pre/post-registration, etc.)
 - Action API (event and api objects)
+- **event.request and GeoIP Object** (countryCode, cityName, latitude, longitude, timeZone)
 - Secrets and Dependencies
 - **Email Templates** (Verification, Welcome, Password Reset, MFA Enrollment, etc.)
 - Custom Domains (CCDUL - Configuring Custom Domain for Universal Login)
@@ -99,6 +101,7 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Session Management Fundamentals
 - Three Session Layers (Application, Auth0 SSO, IdP)
 - Single Sign-On (SSO) Sessions
+- **Logout Endpoints** (/v2/logout, /oidc/logout, /samlp/{client}/logout)
 - Logout Options (Application, Auth0, Federated, Back-Channel, Global)
 - Federated Logout (when and why to use)
 - Back-Channel Logout
@@ -106,10 +109,6 @@ Comprehensive study materials for the Auth0 Developer Exam, organized by topic.
 - Multi-Tenancy vs Single Tenancy
 - Auth0 Organizations for Multi-Tenancy
 - Session Management Best Practices
-- Scopes vs Permissions
-- Authorization Strategies (RBAC, ABAC, ACL, ReBAC)
-- API Authorization Implementation
-- Authorization Best Practices
 
 ### [10 - Universal Login](./10-universal-login.md)
 - Classic vs New Universal Login Experience
